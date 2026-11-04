@@ -1,10 +1,9 @@
 #!/usr/bin/env node
-import { pathToFileURL } from "node:url";
 // pixel-office CLI: `pixel-office init [--locale tr] [--no-memory-git]`, `pixel-office [start] [--port N] [--dir path] [--no-open]`, `pixel-office stop [--dir path]`
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const args = process.argv.slice(2);
@@ -15,11 +14,11 @@ const dist = path.join(pkgRoot, "dist", "server");
 const useDist = existsSync(path.join(dist, "index.js"));
 const cfgMod = useDist ? await import(pathToFileURL(path.join(dist, "config.js")).href) : await import(pathToFileURL(path.join(pkgRoot, "src", "server", "config.ts")).href).catch(() => null);
 if (!cfgMod) { console.error("Build first: npm run build"); process.exit(1); }
-// Where files live: --dir <project> or an `init`ed current folder â†’ project mode; otherwise ~/.pixel-office (global).
+// Where files live: --dir <project> or an `init`ed current folder → project mode; otherwise ~/.pixel-office (global).
 const R = cfgMod.resolveRoot({ dir: flag("--dir"), global: has("--global") || cmd === "start" && has("-g") });
 
 if (cmd === "help" || has("--help") || has("-h")) {
-  console.log(`pixel-office â€” a pixel-art office for your Claude agents
+  console.log(`pixel-office — a pixel-art office for your Claude agents
 
   pixel-office                      start your office (~/.pixel-office) and open the browser
   pixel-office stop                 stop it
@@ -36,7 +35,7 @@ if (cmd === "init") {
   const target = has("--global") ? cfgMod.globalRoot() : cfgMod.projectRoot(flag("--dir", process.cwd()));
   const res = cfgMod.initRoot(target, { locale: flag("--locale", "en"), memoryInGit: !has("--no-memory-git") });
   console.log(`Created ${res.configFile}`);
-  console.log(`Employees live in ${res.employeesDir}/ â€” use the "+ Hire" button in the office, or copy _template by hand.`);
+  console.log(`Employees live in ${res.employeesDir}/ — use the "+ Hire" button in the office, or copy _template by hand.`);
   console.log(`Start with: pixel-office${target.mode === "project" ? "" : " --global"}`);
   process.exit(0);
 }
@@ -78,4 +77,3 @@ const child = entry
   : spawn(process.execPath, [path.join(pkgRoot, "node_modules", "tsx", "dist", "cli.mjs"), path.join(pkgRoot, "src", "server", "index.ts")], { stdio: "inherit", env });
 child.on("exit", (code) => process.exit(code ?? 0));
 for (const sig of ["SIGINT", "SIGTERM"]) process.on(sig, () => child.kill(sig));
-

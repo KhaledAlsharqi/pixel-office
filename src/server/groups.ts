@@ -23,13 +23,17 @@ export interface GroupDoc { id: string; name: string; members: GroupMember[]; le
 
 const MAX_CHAIN = 8;      // answers in a row between employees before the group waits for the boss
 const KEEP = 1000;        // messages kept per group
-const HISTORY_LINES = 15; // what an employee is shown of the conversation
+const HISTORY_LINES = 25; // what an employee is shown of the conversation (each answer runs in a fresh short session)
+const AGENT_MENTIONS = 3; // colleagues one employee message can ask at once (@all is the boss's alone)
 
 const memberKey = (m: GroupMember) => `${m.office}/${m.emp}`;
 // names as lookup keys, ignoring case, diacritics, tatweel, alef/yaa/taa-marbuta spellings and _ / spaces
 const nameKey = (s: string) => s.normalize("NFKC").toLowerCase().replace(/[ً-ٰٟـ]/g, "")
   .replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/[\s_-]+/g, " ").trim();
 const ALL = ["الكل", "الجميع", "all", "everyone", "herkes"].map(nameKey);
+// an answer that only thanks or agrees adds nothing to a conversation between employees
+const COURTESY = /^(شكرا|شكرًا|شكراً|مشكور|تمام|اتفق|أتفق|متفق|موافق|حسنا|حسنًا|حسناً|ممتاز|رائع|جميل|تم|ok|okay|thanks|thank you|agreed|noted|great|sounds good|👍|🙏)/i;
+const isCourtesy = (s: string) => s.length <= 60 && !/[?؟@]/.test(s) && COURTESY.test(s.trim());
 
 export interface GroupsDeps {
   employee(office: string, emp: string): Employee | undefined;
@@ -41,7 +45,7 @@ export interface GroupsDeps {
 
 export class Groups {
   private docs = new Map<string, GroupDoc>();
-  private queues = new Map<string, Promise<void>>(); // one answer at a time per group, in order
+  private locks = new WeakMap<Employee, Promise<void>>(); // one group answer at a time per employee; members answer in parallel
   private typing = new Map<string, Set<string>>();    // group → member keys composing an answer right now
   private epochs = new Map<string, number>();          // bumped when a group pauses: answers employees asked for before it are dropped
   private dir: string;
@@ -112,12 +116,21 @@ export class Groups {
   }
   private note(g: GroupDoc, text: string) { this.append(g, "system", "", text); }
 
-  /** Who a message asks to answer: the members named with @ (or all of them), excluding the writer. */
-  private mentioned(g: GroupDoc, text: string, from?: GroupMember): GroupMember[] {
-    const hay = nameKey(text);
+  /** Who a message asks to answer: the members named with @, excluding the writer; @all (boss only) asks everyone.
+   *  Longer names are matched first and taken out, so "@المدير العام" is not also read as a member called "المدير". */
+  private mentioned(g: GroupDoc, text: string, from?: GroupMember, allowAll = true): GroupMember[] {
+    let hay = nameKey(text);
     const others = g.members.filter((m) => !from || memberKey(m) !== memberKey(from));
-    if (ALL.some((a) => hay.includes("@" + a))) return others;
-    return others.filter((m) => { const e = this.resolve(m); return !!e && (hay.includes("@" + nameKey(e.cfg.name)) || hay.includes("@" + nameKey(e.cfg.id))); });
+    if (allowAll && ALL.some((a) => hay.includes("@" + a))) return others;
+    const names = others.flatMap((m) => { const e = this.resolve(m); return e ? [{ m, key: nameKey(e.cfg.name) }, { m, key: nameKey(e.cfg.id) }] : []; })
+      .filter((x) => x.key).sort((a, b) => b.key.length - a.key.length);
+    const hit: GroupMember[] = [];
+    for (const { m, key } of names) {
+      if (!hay.includes("@" + key)) continue;
+      hay = hay.split("@" + key).join(" ");
+      if (!hit.includes(m)) hit.push(m);
+    }
+    return hit;
   }
 
   /** The boss writes in the group. */
@@ -134,7 +147,7 @@ export class Groups {
   postFromEmployee(g: GroupDoc, e: Employee, text: string) {
     const me = this.memberOf(g, e);
     this.append(g, me ? memberKey(me) : `${e.cfg.officeId}/${e.cfg.id}`, e.cfg.name, text, e.cfg.color);
-    const ask = this.mentioned(g, text, me);
+    const ask = this.mentioned(g, text, me, false).slice(0, AGENT_MENTIONS);
     if (!ask.length) return;
     if (g.paused) return;
     for (const m of ask) {
@@ -150,24 +163,31 @@ export class Groups {
     this.save(g);
   }
 
-  /** One member answers, after whatever the group is already waiting on. */
+  /** One member answers. Members answer in parallel; one employee answers one group question at a time. A busy member does not
+   *  hold anyone up: the group is told, and the answer comes when they are free. Whatever goes wrong is said in the group. */
   private ask(g: GroupDoc, m: GroupMember, byBoss: boolean) {
-    const prev = this.queues.get(g.id) ?? Promise.resolve();
+    const e = this.resolve(m);
+    if (!e) return;
     const epoch = this.epochs.get(g.id) ?? 0;
-    const next = prev.then(async () => {
-      const e = this.resolve(m);
-      if (!e || !this.docs.has(g.id)) return;
+    const run = (this.locks.get(e) ?? Promise.resolve()).then(async () => {
+      if (!this.docs.has(g.id)) return;
       if (!byBoss && (g.paused || (this.epochs.get(g.id) ?? 0) !== epoch)) return; // the group paused meanwhile
       const key = memberKey(m);
+      if (e.busy) this.note(g, t("server.groups.busy", { name: e.cfg.name }));
       const typing = this.typing.get(g.id) ?? new Set<string>();
       typing.add(key); this.typing.set(g.id, typing); this.changed(g);
-      let reply = "";
-      try { reply = (await e.sendGroup(this.prompt(g, e))).trim(); }
-      catch (err) { console.error(`[groups] ${g.name} / ${e.cfg.name}:`, (err as Error).message); }
+      let res: Awaited<ReturnType<Employee["sendGroup"]>> = { text: "" };
+      try { res = await e.sendGroup(this.prompt(g, e)); }
+      catch (err) { res = { text: "", error: (err as Error).message }; }
       finally { typing.delete(key); this.changed(g); }
-      if (reply && !/^[—–-]+$/.test(reply) && this.docs.has(g.id)) this.postFromEmployee(g, e, reply);
+      if (!this.docs.has(g.id)) return;
+      const reply = res.text.trim();
+      if (res.skipped) return this.note(g, t(res.skipped === "meeting" ? "server.groups.inMeeting" : "server.groups.stillBusy", { name: e.cfg.name }));
+      if (!reply && res.error) return this.note(g, res.error === "timeout" ? t("server.groups.timeout", { name: e.cfg.name }) : t("server.groups.failed", { name: e.cfg.name, error: res.error.replace(/\s+/g, " ").slice(0, 200) }));
+      if (!reply || /^[—–-]+$/.test(reply) || (!byBoss && isCourtesy(reply))) return;
+      this.postFromEmployee(g, e, reply);
     });
-    this.queues.set(g.id, next.catch(() => {}));
+    this.locks.set(e, run.catch(() => {}));
   }
 
   private prompt(g: GroupDoc, e: Employee): string {

@@ -673,27 +673,37 @@ export class Employee extends EventEmitter {
     return reply;
   }
 
-  // One answer in a group chat (groups.ts): like a meeting turn, the prompt and the answer stay out of this employee's own chat.
+  // One answer in a group chat (groups.ts). Like a meeting turn the prompt and the answer stay out of this employee's own chat, and
+  // it runs in a short separate session ("side"), so group talk neither fills the personal session nor mixes with it.
+  // Resolves with the answer, or with what went wrong (the turn's error, a timeout, or why it never started).
   private groupTurn = false;
   get inGroupTurn() { return this.groupTurn; }
-  async sendGroup(prompt: string): Promise<string> {
-    await this.whenFree(10 * 60e3);
-    if (this.busy || this.inMeeting) return ""; // still busy after waiting, or sitting in a meeting: the group goes on without them
+  async sendGroup(prompt: string, maxWaitMs = 30 * 60e3): Promise<{ text: string; error?: string; skipped?: "busy" | "meeting" }> {
+    await this.whenFree(maxWaitMs);
+    if (this.inMeeting) return { text: "", skipped: "meeting" };
+    if (this.busy || this.side) return { text: "", skipped: "busy" };
     this.meetingTurn = true;
     this.groupTurn = true;
     this.turnTexts = [];
-    const reply = new Promise<string>((resolve) => {
-      let open = true;
-      const done = (text: string) => { if (!open) return; open = false; clearTimeout(timer); clearTimeout(backstop); this.off("turn", done); this.meetingTurn = false; this.groupTurn = false; resolve(text ?? ""); };
+    return new Promise((resolve) => {
+      let open = true, error: string | undefined;
+      // a failed turn reports its error right after the turn closes: listen a moment longer to catch it
+      const onMsg = (m: ChatMessage) => { if (m.role === "system") error = m.text; };
+      const done = (text: string, timeout = false) => {
+        if (!open) return;
+        open = false; clearTimeout(timer); clearTimeout(backstop); this.off("turn", done);
+        this.meetingTurn = false; this.groupTurn = false;
+        setImmediate(() => { this.off("message", onMsg); resolve({ text: text ?? "", error: error ?? (timeout ? "timeout" : undefined) }); });
+      };
       let backstop: NodeJS.Timeout | undefined;
       const timer = setTimeout(() => {
-        if (this.meetingTurn && this.busy) { void this.interrupt({ task: "keep", resume: false }); backstop = setTimeout(() => done(""), 10e3); }
-        else done("");
-      }, 5 * 60e3);
+        if (this.meetingTurn && this.busy) { void this.interrupt({ task: "keep", resume: false }); backstop = setTimeout(() => done("", true), 10e3); }
+        else done("", true);
+      }, 10 * 60e3);
       this.on("turn", done);
+      this.on("message", onMsg);
+      this.dispatch("side", prompt, { digest: true });
     });
-    this.dispatch("chat", prompt, { digest: true });
-    return reply;
   }
 
   private whenFree(maxMs: number): Promise<void> {
@@ -1149,7 +1159,7 @@ export class Employee extends EventEmitter {
       if (turn.trim()) this.taskTalk.push(`${tt("server.task.talkYou", "You")}: ${clip(turn, 1500)}`);
     }
     // the chat session learns what the refresh changed, instead of hearing nothing of it
-    if (key === "side" && !detail && turn.trim()) this.addPreamble(tt("server.refreshNote", "[Note: in a separate short session you tidied your memory file. What you reported: {summary}]", { summary: clip(turn.replace(/\s+/g, " "), 800) }));
+    if (key === "side" && !this.groupTurn && !detail && turn.trim()) this.addPreamble(tt("server.refreshNote", "[Note: in a separate short session you tidied your memory file. What you reported: {summary}]", { summary: clip(turn.replace(/\s+/g, " "), 800) }));
     this.closeTurn(turn);
     this.unanswered = []; // answered, or failed in plain sight: either way not something to replay later
     if (!detail) this.recovered = false;

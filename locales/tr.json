@@ -376,7 +376,7 @@
     },
     "groups": {
       "paused": "Grup, çalışanlar arasında art arda {n} yanıttan sonra durdu. Devam etmek için bir şey yaz.",
-      "turn": "[Grup sohbeti «{group}»: yanıt sırası sende, {name}]\nSon mesajlar:\n{history}\n\nÜyeler:\n{members}\n\nYalnızca yanıtını yaz: grupta senin adınla yayınlanır. Bir üyeyi dahil etmek için @ ve adını yaz. Ekleyecek bir şeyin yoksa yalnızca «—» yaz. Bu yanıt için post_to_group kullanma.",
+      "turn": "[Grup sohbeti «{group}»: yanıt sırası sende, {name}]\nSon mesajlar:\n{history}\n\nÜyeler:\n{members}\n\nYalnızca yanıtını yaz: grupta senin adınla yayınlanır. Yeni bir şey ekle (bilgi, karar, soru); yalnızca teşekkür etmek ya da katılmak için yanıt verme. Bir iki üyeyi dahil etmek için @ ve adını yaz (@all yalnızca patron içindir). Ekleyecek bir şeyin yoksa yalnızca «—» yaz. Bu yanıt için post_to_group kullanma.",
       "listDesc": "Bulunduğun grup sohbetlerini son mesajlarıyla listele.",
       "none": "Hiçbir grup sohbetinde değilsin.",
       "readDesc": "Grup sohbetlerinden birinin son mesajlarını oku.",
@@ -385,7 +385,12 @@
       "postDesc": "Bir konu açmak ya da gruba kendiliğinden bir şey söylemek için grup sohbetlerinden birine mesaj yaz. Yanıt vermesini istediğin üyeyi @ ve adıyla an. (Ofis senden bir grupta yanıt istediğinde doğrudan yanıtı yaz.)",
       "answerDirectly": "Şu anda bu grupta yanıt veriyorsun: post_to_group kullanmak yerine yanıtını doğrudan yaz.",
       "posted": "«{name}» grubuna gönderildi.",
-      "needNameMembers": "Bir grubun adı ve en az bir üyesi olmalı."
+      "needNameMembers": "Bir grubun adı ve en az bir üyesi olmalı.",
+      "busy": "⏳ {name} bir görevle meşgul, boşalınca yanıtlayacak.",
+      "stillBusy": "{name} meşgul kaldı ve yanıt vermedi.",
+      "inMeeting": "{name} toplantıda ve yanıt vermedi.",
+      "failed": "⚠️ {name} yanıt veremedi: {error}",
+      "timeout": "⚠️ {name} 10 dakika içinde yanıt vermedi."
     }
   },
   "rooms": {

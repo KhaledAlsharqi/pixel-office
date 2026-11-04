@@ -376,7 +376,7 @@
     },
     "groups": {
       "paused": "The group paused after {n} answers in a row between employees. Write something to continue.",
-      "turn": "[Group chat «{group}»: your turn to answer, {name}]\nLast messages:\n{history}\n\nMembers:\n{members}\n\nWrite only your answer: it is posted in the group under your name. To ask a member to join in, write @ and their name. If you have nothing to add, write only «—». Do not use post_to_group for this answer.",
+      "turn": "[Group chat «{group}»: your turn to answer, {name}]\nLast messages:\n{history}\n\nMembers:\n{members}\n\nWrite only your answer: it is posted in the group under your name. Add something new (information, a decision, a question); do not answer only to thank or agree. To ask one or two members to join in, write @ and their name (@all is for the boss only). If you have nothing to add, write only «—». Do not use post_to_group for this answer.",
       "listDesc": "List the group chats you are in, with their last message.",
       "none": "You are in no group chat.",
       "readDesc": "Read the latest messages of one of your group chats.",
@@ -385,7 +385,12 @@
       "postDesc": "Write a message in one of your group chats, to start a topic or tell the group something on your own. Name a member with @ and their name to ask them to answer. (When the office asks you to answer in a group, write the answer itself instead.)",
       "answerDirectly": "You are answering in this group right now: write your answer as your reply instead of using post_to_group.",
       "posted": "Posted in «{name}».",
-      "needNameMembers": "A group needs a name and at least one member."
+      "needNameMembers": "A group needs a name and at least one member.",
+      "busy": "⏳ {name} is busy with a task and will answer when free.",
+      "stillBusy": "{name} stayed busy and did not answer.",
+      "inMeeting": "{name} is in a meeting and did not answer.",
+      "failed": "⚠️ {name} could not answer: {error}",
+      "timeout": "⚠️ {name} did not answer within 10 minutes."
     }
   },
   "rooms": {

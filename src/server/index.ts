@@ -21,6 +21,7 @@ import { CATEGORIES, initIntegrations, listIntegrations, saveIntegration, checkI
 import { CLAUDE_MODELS, PROVIDERS, activeModels, isActiveModel, initProviders, providersReady, providerStatuses, updateProvider, installProvider, loginProvider, refreshProvider, canInstall, canLogin, type ProviderId } from "./providers.js";
 import { HERMES_PREFIX, hermesProfileOf, planHermesImport, readHermesOrg, guessHermesOrgFile, hermesProfiles, hermesLinked, linkHermesProfile, hermesActiveFor } from "./hermes.js";
 import { writeHermesEmployee } from "./hermes-import.js";
+import { mountGroups } from "./groups.js";
 import { createGuard, isLoopbackHost } from "./security.js";
 import { acquireLock } from "./lock.js";
 import { writeFileAtomicSync } from "./fsutil.js";
@@ -684,6 +685,15 @@ const hermesInOffice = () => {
   for (const o of offices.values()) for (const e of o.employees.values()) if (e.cfg.model?.startsWith(HERMES_PREFIX) && e.cfg.dir && !seen.has(hermesProfileOf(e.cfg.model))) seen.set(hermesProfileOf(e.cfg.model), e.cfg.dir);
   return seen;
 };
+// ---- group chats between employees of any office and the boss (groups.ts) ----
+mountGroups(app, {
+  employee: (office, emp) => offices.get(office)?.employees.get(emp),
+  officeName: (office) => offices.get(office)?.def.name ?? office,
+  everyone: () => [...offices.values()].map((o) => ({ office: o.def.id, officeName: o.def.name, employees: [...o.employees.values()] })),
+  broadcast: (payload) => broadcast(payload),
+  dataDir: settings.dataDir,
+});
+
 // Office tools for Hermes profiles: a fixed address per profile, guarded by a key derived from a secret kept in the data folder
 // (so the entry written into the profile's config.yaml keeps working after a restart). See hermes.ts, "link".
 function hermesLinkSecret(): string {

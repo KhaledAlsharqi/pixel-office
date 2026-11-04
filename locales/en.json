@@ -373,6 +373,19 @@
       "orgUnreadable": "Could not read the org file: {file}",
       "noProfiles": "No Hermes profiles were found.",
       "linkBusy": "Linking is already running."
+    },
+    "groups": {
+      "paused": "The group paused after {n} answers in a row between employees. Write something to continue.",
+      "turn": "[Group chat «{group}»: your turn to answer, {name}]\nLast messages:\n{history}\n\nMembers:\n{members}\n\nWrite only your answer: it is posted in the group under your name. To ask a member to join in, write @ and their name. If you have nothing to add, write only «—». Do not use post_to_group for this answer.",
+      "listDesc": "List the group chats you are in, with their last message.",
+      "none": "You are in no group chat.",
+      "readDesc": "Read the latest messages of one of your group chats.",
+      "groupDesc": "The group's name",
+      "notFound": "No group named \"{name}\" among yours: {list}",
+      "postDesc": "Write a message in one of your group chats, to start a topic or tell the group something on your own. Name a member with @ and their name to ask them to answer. (When the office asks you to answer in a group, write the answer itself instead.)",
+      "answerDirectly": "You are answering in this group right now: write your answer as your reply instead of using post_to_group.",
+      "posted": "Posted in «{name}».",
+      "needNameMembers": "A group needs a name and at least one member."
     }
   },
   "rooms": {
@@ -5696,6 +5709,31 @@
       "integrationsSub": "Connect outside services",
       "skills": "Skills",
       "skillsSub": "Ready-made skills for your employees"
+    },
+    "groups": {
+      "btnTip": "Group chats",
+      "title": "Groups",
+      "newGroup": "New group",
+      "fromOffices": "A group for every office",
+      "fromOfficesDone": "{n} groups added.",
+      "name": "Group name",
+      "members": "Members",
+      "lead": "Answers when nobody is named",
+      "create": "Create",
+      "save": "Save",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "delete": "Delete group",
+      "deleteConfirm": "Delete the group «{name}» and its messages?",
+      "empty": "No groups yet. Make one, or one for every office.",
+      "pick": "Pick a group on the side.",
+      "inputPh": "Write to the group… @name asks someone, @all asks everyone",
+      "send": "Send",
+      "typing": "{names} writing…",
+      "paused": "Paused: waiting for you",
+      "membersN": "{n} members",
+      "you": "You",
+      "hint": "Nobody named → the lead answers · @all → everyone answers · agents can name each other"
     }
   }
 }

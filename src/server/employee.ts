@@ -673,6 +673,29 @@ export class Employee extends EventEmitter {
     return reply;
   }
 
+  // One answer in a group chat (groups.ts): like a meeting turn, the prompt and the answer stay out of this employee's own chat.
+  private groupTurn = false;
+  get inGroupTurn() { return this.groupTurn; }
+  async sendGroup(prompt: string): Promise<string> {
+    await this.whenFree(10 * 60e3);
+    if (this.busy || this.inMeeting) return ""; // still busy after waiting, or sitting in a meeting: the group goes on without them
+    this.meetingTurn = true;
+    this.groupTurn = true;
+    this.turnTexts = [];
+    const reply = new Promise<string>((resolve) => {
+      let open = true;
+      const done = (text: string) => { if (!open) return; open = false; clearTimeout(timer); clearTimeout(backstop); this.off("turn", done); this.meetingTurn = false; this.groupTurn = false; resolve(text ?? ""); };
+      let backstop: NodeJS.Timeout | undefined;
+      const timer = setTimeout(() => {
+        if (this.meetingTurn && this.busy) { void this.interrupt({ task: "keep", resume: false }); backstop = setTimeout(() => done(""), 10e3); }
+        else done("");
+      }, 5 * 60e3);
+      this.on("turn", done);
+    });
+    this.dispatch("chat", prompt, { digest: true });
+    return reply;
+  }
+
   private whenFree(maxMs: number): Promise<void> {
     if (!this.busy) return Promise.resolve();
     return new Promise<void>((resolve) => {

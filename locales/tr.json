@@ -373,6 +373,19 @@
       "orgUnreadable": "Organizasyon dosyası okunamadı: {file}",
       "noProfiles": "Hiç Hermes profili bulunamadı.",
       "linkBusy": "Bağlama zaten sürüyor."
+    },
+    "groups": {
+      "paused": "Grup, çalışanlar arasında art arda {n} yanıttan sonra durdu. Devam etmek için bir şey yaz.",
+      "turn": "[Grup sohbeti «{group}»: yanıt sırası sende, {name}]\nSon mesajlar:\n{history}\n\nÜyeler:\n{members}\n\nYalnızca yanıtını yaz: grupta senin adınla yayınlanır. Bir üyeyi dahil etmek için @ ve adını yaz. Ekleyecek bir şeyin yoksa yalnızca «—» yaz. Bu yanıt için post_to_group kullanma.",
+      "listDesc": "Bulunduğun grup sohbetlerini son mesajlarıyla listele.",
+      "none": "Hiçbir grup sohbetinde değilsin.",
+      "readDesc": "Grup sohbetlerinden birinin son mesajlarını oku.",
+      "groupDesc": "Grubun adı",
+      "notFound": "Gruplarının arasında \"{name}\" adlı bir grup yok: {list}",
+      "postDesc": "Bir konu açmak ya da gruba kendiliğinden bir şey söylemek için grup sohbetlerinden birine mesaj yaz. Yanıt vermesini istediğin üyeyi @ ve adıyla an. (Ofis senden bir grupta yanıt istediğinde doğrudan yanıtı yaz.)",
+      "answerDirectly": "Şu anda bu grupta yanıt veriyorsun: post_to_group kullanmak yerine yanıtını doğrudan yaz.",
+      "posted": "«{name}» grubuna gönderildi.",
+      "needNameMembers": "Bir grubun adı ve en az bir üyesi olmalı."
     }
   },
   "rooms": {
@@ -5641,6 +5654,31 @@
       "integrationsSub": "Dış servisleri bağla",
       "skills": "Skiller",
       "skillsSub": "Çalışanların için hazır skiller"
+    },
+    "groups": {
+      "btnTip": "Grup sohbetleri",
+      "title": "Gruplar",
+      "newGroup": "Yeni grup",
+      "fromOffices": "Her ofis için bir grup",
+      "fromOfficesDone": "{n} grup eklendi.",
+      "name": "Grup adı",
+      "members": "Üyeler",
+      "lead": "Kimse anılmazsa yanıtlayan",
+      "create": "Oluştur",
+      "save": "Kaydet",
+      "cancel": "Vazgeç",
+      "edit": "Düzenle",
+      "delete": "Grubu sil",
+      "deleteConfirm": "«{name}» grubu ve mesajları silinsin mi?",
+      "empty": "Henüz grup yok. Bir tane ya da her ofis için bir tane oluştur.",
+      "pick": "Yandan bir grup seç.",
+      "inputPh": "Gruba yaz… @ad birini, @all herkesi yanıtlamaya çağırır",
+      "send": "Gönder",
+      "typing": "{names} yazıyor…",
+      "paused": "Durdu: seni bekliyor",
+      "membersN": "{n} üye",
+      "you": "Sen",
+      "hint": "Kimse anılmazsa grup sorumlusu yanıtlar · @all → herkes yanıtlar · ajanlar birbirini anabilir"
     }
   }
 }

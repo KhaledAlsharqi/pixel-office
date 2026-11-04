@@ -28,6 +28,12 @@ export interface Colleagues {
 
 export const OFFICE_TOOLS = ["remember", "propose_idea", "list_ideas", "promote_idea", "review_idea", "edit_idea", "list_colleagues", "message_colleague", "raise_hand", "share_note", "read_notes", "edit_note", "delete_note", "list_tasks", "update_task", "assign_task", "start_task", "colleague_activity"].map((n) => `mcp__office__${n}`);
 
+// Office tools added by this fork's own modules (groups.ts): the same employee and colleagues, served with the others to every engine.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- tools of any input shape, as tool() makes them
+type ExtraTools = (self: Employee, colleagues: Colleagues) => ReturnType<typeof tool<any>>[];
+const extraTools: ExtraTools[] = [];
+export function addOfficeTools(defs: ExtraTools, names: string[]) { extraTools.push(defs); OFFICE_TOOLS.push(...names.map((n) => `mcp__office__${n}`)); }
+
 const text = (s: string, isError = false) => ({ content: [{ type: "text" as const, text: s }], ...(isError ? { isError: true } : {}) });
 
 // In-process MCP server giving one employee a view of, and a line to, the colleagues in the same office (Claude engine).
@@ -327,5 +333,6 @@ export function officeToolDefs(self: Employee, colleagues: Colleagues) {
           return text(t("server.office.replied", { name: target.cfg.name, text: answer }));
         },
       ),
+      ...extraTools.flatMap((f) => f(self, colleagues)),
   ];
 }

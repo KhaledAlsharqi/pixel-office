@@ -156,7 +156,7 @@ const settingsUI = (() => {
   function stateText(p) {
     if (!p.installed && p.canInstall) return escapeHtml(t("ui.settings.models.state.missing"));
     const [code, ...rest] = String(p.detail || "").split(":");
-    const known = ["missing", "signedOut", "needKey", "badKey", "authExpired", "offline", "error", "profiles", "noProfiles"];
+    const known = ["missing", "signedOut", "needKey", "badKey", "authExpired", "offline", "error", "profiles", "noProfiles", "gatewayDown"];
     if (known.includes(code)) return escapeHtml(t(`ui.settings.models.state.${code}`, { detail: rest.join(":") }));
     if (code.startsWith("http")) return escapeHtml(t("ui.settings.models.state.error", { detail: p.detail }));
     return escapeHtml(p.detail || "");

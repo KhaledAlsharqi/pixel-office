@@ -47,6 +47,7 @@ export class Groups {
   private docs = new Map<string, GroupDoc>();
   private locks = new WeakMap<Employee, Promise<void>>(); // one group answer at a time per employee; members answer in parallel
   private typing = new Map<string, Set<string>>();    // group → member keys composing an answer right now
+  private failures = new Map<string, { timer: NodeJS.Timeout; byError: Map<string, string[]> }>(); // group → error → who; said once
   private epochs = new Map<string, number>();          // bumped when a group pauses: answers employees asked for before it are dropped
   private dir: string;
 
@@ -183,11 +184,35 @@ export class Groups {
       if (!this.docs.has(g.id)) return;
       const reply = res.text.trim();
       if (res.skipped) return this.note(g, t(res.skipped === "meeting" ? "server.groups.inMeeting" : "server.groups.stillBusy", { name: e.cfg.name }));
-      if (!reply && res.error) return this.note(g, res.error === "timeout" ? t("server.groups.timeout", { name: e.cfg.name }) : t("server.groups.failed", { name: e.cfg.name, error: res.error.replace(/\s+/g, " ").slice(0, 200) }));
+      if (!reply && res.error) {
+        // the employee's chat says "The turn ended with an error: …": the group needs only the "…"
+        const prefix = t("server.turnError", { detail: "" }).trim();
+        const error = res.error.startsWith(prefix) ? res.error.slice(prefix.length).trim() : res.error;
+        return this.failNote(g, e.cfg.name, error === "timeout" ? "timeout" : error.replace(/\s+/g, " ").slice(0, 240));
+      }
       if (!reply || /^[—–-]+$/.test(reply) || (!byBoss && isCourtesy(reply))) return;
       this.postFromEmployee(g, e, reply);
     });
     this.locks.set(e, run.catch(() => {}));
+  }
+
+  // Answers that fail together (the same error for many members, e.g. Hermes is down) are said in one line, not one each.
+  private failNote(g: GroupDoc, name: string, error: string) {
+    let f = this.failures.get(g.id);
+    if (!f) { f = { timer: setTimeout(() => this.flushFailures(g), 2500), byError: new Map() }; this.failures.set(g.id, f); }
+    const who = f.byError.get(error) ?? [];
+    who.push(name);
+    f.byError.set(error, who);
+  }
+  private flushFailures(g: GroupDoc) {
+    const f = this.failures.get(g.id);
+    this.failures.delete(g.id);
+    if (!f || !this.docs.has(g.id)) return;
+    const sep = t("server.groups.sep");
+    for (const [error, names] of f.byError) {
+      const who = names.length <= 3 ? names.join(sep) : t("server.groups.manyNames", { names: names.slice(0, 3).join(sep), n: names.length - 3 });
+      this.note(g, error === "timeout" ? t("server.groups.timeout", { name: who }) : t("server.groups.failed", { name: who, error }));
+    }
   }
 
   private prompt(g: GroupDoc, e: Employee): string {

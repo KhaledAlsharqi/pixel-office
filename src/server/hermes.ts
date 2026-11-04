@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execFile, spawn, type ChildProcess } from "node:child_process";
+import { t } from "./runtime.js";
 
 // The fifth engine: Hermes Agent (Nous Research). Every Hermes *profile* is one employee: its own model, provider, memory,
 // skills, tools and SOUL stay in Hermes, exactly as Hermes Desktop and Telegram use them; the office only talks to it.
@@ -103,16 +104,32 @@ export function hermesModels(): Array<{ id: string; name: string; desc: string; 
 }
 
 // ---- status (Settings → Models) ----
+const runHermes = (args: string[], timeout: number) => new Promise<{ ok: boolean; out: string }>((resolve) => {
+  execFile(hermesBin(), args, { timeout, encoding: "utf8", windowsHide: true, env: hermesEnv() }, (err, stdout, stderr) => resolve({ ok: !err, out: `${stdout ?? ""}${stderr ?? ""}`.trim() }));
+});
 export async function probeHermes(): Promise<{ connected: boolean; installed: boolean; version: string; detail: string }> {
-  const bin = hermesBin();
-  const v = await new Promise<{ ok: boolean; out: string }>((resolve) => {
-    // the first start of Hermes' Python can take a while on Windows
-    execFile(bin, ["--version"], { timeout: 45000, encoding: "utf8", windowsHide: true, env: hermesEnv() }, (err, stdout, stderr) => resolve({ ok: !err, out: `${stdout ?? ""}${stderr ?? ""}`.trim() }));
-  });
+  // the first start of Hermes' Python can take a while on Windows
+  const v = await runHermes(["--version"], 45000);
   if (!v.ok) return { connected: false, installed: false, version: "", detail: "missing" };
   const version = (v.out.split("\n").find((l) => /\d+\.\d+/.test(l)) ?? "").replace(/^.*?(\d+\.\d+[\w.+-]*).*$/, "$1");
   const n = hermesProfiles(true).length;
-  return { connected: n > 0, installed: true, version, detail: n > 0 ? `profiles:${n}` : "noProfiles" };
+  if (!n) return { connected: false, installed: true, version, detail: "noProfiles" };
+  // every Hermes conversation runs through its gateway: when it is down (and Hermes cannot start it), no agent answers
+  const g = await runHermes(["gateway", "status"], 30000);
+  const down = /no gateway process detected|gateway is not running|not running/i.test(g.out);
+  return { connected: true, installed: true, version, detail: down ? "gatewayDown" : `profiles:${n}` };
+}
+
+// Hermes errors people meet, said in their language with what to do; the original stays in brackets.
+const KNOWN_ERRORS: Array<[RegExp, string]> = [
+  [/gateway (inaccessible|absent|unavailable|draining)|service_identity_unverified|no gateway process|profile_parked|service_(failed|start_failed|disabled|masked|account_mismatch)/i, "gateway"],
+  [/exhausted|cooldown|insufficient_quota|usage limit|quota exceeded/i, "exhausted"],
+  [/\b401\b|unauthori[sz]ed|refresh token|invalid[_ ]api[_ ]key|sign in again|log ?in again|credentials? (expired|invalid)/i, "auth"],
+  [/\b429\b|rate.?limit|too many requests/i, "rate"],
+];
+export function explainHermesError(raw: string): string {
+  for (const [re, key] of KNOWN_ERRORS) if (re.test(raw)) return `${t(`server.hermes.err.${key}`)} (${raw.replace(/\s+/g, " ").slice(0, 120)})`;
+  return raw;
 }
 
 // What a Hermes process inherits: the office's own environment, minus anything that would pin it to another task or profile
@@ -200,6 +217,7 @@ export function runHermesTurn(turn: HermesTurn, h: HermesHandlers): { done: Prom
       if (killed) return resolve({ ...res, ok: false, error: "interrupted" });
       if (!gotResult) { res.ok = false; res.error = lastError(err) || `hermes exited with ${code}`; }
       if (!res.ok && turn.session && (RESUME_FAILED.test(res.error ?? "") || RESUME_FAILED.test(err))) res.notFound = true;
+      if (!res.ok && res.error && !res.notFound) res.error = explainHermesError(res.error);
       resolve(res);
     });
   });

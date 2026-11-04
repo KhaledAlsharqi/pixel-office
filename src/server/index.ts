@@ -19,7 +19,7 @@ import { officeToolDefs } from "./office-tools.js";
 import { initSkills, skillCatalog, viewOfSkill, skillById, previewSkill, installSkill, uninstallSkill, installedIds } from "./skills.js";
 import { CATEGORIES, initIntegrations, listIntegrations, saveIntegration, checkIntegration, removeIntegration, entryOf, startOAuth, finishOAuth, addCustom, gateway, setOwnClient } from "./integrations.js";
 import { CLAUDE_MODELS, PROVIDERS, activeModels, isActiveModel, initProviders, providersReady, providerStatuses, updateProvider, installProvider, loginProvider, refreshProvider, canInstall, canLogin, type ProviderId } from "./providers.js";
-import { HERMES_PREFIX, hermesProfileOf, planHermesImport, readHermesOrg, guessHermesOrgFile } from "./hermes.js";
+import { HERMES_PREFIX, hermesProfileOf, planHermesImport, readHermesOrg, guessHermesOrgFile, hermesProfiles, hermesLinked, linkHermesProfile, hermesActiveFor } from "./hermes.js";
 import { writeHermesEmployee } from "./hermes-import.js";
 import { createGuard, isLoopbackHost } from "./security.js";
 import { acquireLock } from "./lock.js";
@@ -684,6 +684,65 @@ const hermesInOffice = () => {
   for (const o of offices.values()) for (const e of o.employees.values()) if (e.cfg.model?.startsWith(HERMES_PREFIX) && e.cfg.dir && !seen.has(hermesProfileOf(e.cfg.model))) seen.set(hermesProfileOf(e.cfg.model), e.cfg.dir);
   return seen;
 };
+// Office tools for Hermes profiles: a fixed address per profile, guarded by a key derived from a secret kept in the data folder
+// (so the entry written into the profile's config.yaml keeps working after a restart). See hermes.ts, "link".
+function hermesLinkSecret(): string {
+  const file = path.join(settings.dataDir, "hermes-link.json");
+  try { const s = String(JSON.parse(fs.readFileSync(file, "utf8")).secret ?? ""); if (s.length >= 32) return s; } catch {}
+  const secret = crypto.randomBytes(32).toString("hex");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify({ secret }, null, 2) + "\n", { mode: 0o600 });
+  return secret;
+}
+const hermesKey = (profile: string) => crypto.createHmac("sha256", hermesLinkSecret()).update(`office:${profile}`).digest("hex");
+const hermesMcpUrl = (profile: string) => `http://127.0.0.1:${settings.port}/mcp-hermes/${encodeURIComponent(profile)}`;
+app.all("/mcp-hermes/:profile", async (req, res) => {
+  const profile = String(req.params.profile);
+  const given = Buffer.from(String(req.headers.authorization ?? "").replace(/^Bearer\s+/i, ""));
+  const want = Buffer.from(hermesKey(profile));
+  if (given.length !== want.length || !crypto.timingSafeEqual(given, want)) { res.status(401).end(); return; }
+  // the employee running a turn for this profile right now, else the profile's first employee in the office
+  let e = hermesActiveFor(profile) as Employee | undefined;
+  if (!e) for (const o of offices.values()) { e = [...o.employees.values()].find((x) => x.cfg.model === HERMES_PREFIX + profile); if (e) break; }
+  const o = e && offices.get(e.cfg.officeId);
+  if (!e || !o || o.employees.get(e.cfg.id) !== e) { res.status(404).end(); return; }
+  if (req.method !== "POST") { res.status(405).json({ jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed" }, id: null }); return; }
+  const server = new McpServer({ name: "office", version: "1.0.0" }, { instructions: t("server.office.instructions") });
+  for (const d of officeToolDefs(e, colleaguesOf(o))) server.registerTool(d.name, { description: d.description, inputSchema: d.inputSchema }, d.handler as never);
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  res.on("close", () => { void transport.close(); void server.close(); });
+  try { await server.connect(transport); await transport.handleRequest(req, res, req.body); }
+  catch (err) { if (!res.headersSent) res.status(500).json({ jsonrpc: "2.0", error: { code: -32603, message: (err as Error).message }, id: null }); }
+});
+// Which profiles have the office tools, and the button that adds (or removes) them in every profile that is in the office.
+const hermesInOfficeProfiles = () => [...new Set([...offices.values()].flatMap((o) => [...o.employees.values()].map((e) => e.cfg.model ?? "").filter((m) => m.startsWith(HERMES_PREFIX)).map(hermesProfileOf)))];
+app.get("/api/hermes/link", (_req, res) => {
+  const profiles = hermesInOfficeProfiles();
+  res.json({ profiles: profiles.length, linked: profiles.filter((p) => hermesLinked(p)).length, port: settings.port });
+});
+let hermesLinking = false;
+app.post("/api/hermes/link", async (req, res) => {
+  const action = req.body?.action === "unlink" ? "unlink" : "link";
+  if (hermesLinking) return res.status(409).json({ error: t("server.hermes.linkBusy") });
+  const known = new Set(hermesProfiles(true).map((p) => p.id));
+  const todo = hermesInOfficeProfiles().filter((p) => known.has(p));
+  if (!todo.length) return res.status(400).json({ error: t("server.hermes.noProfiles") });
+  hermesLinking = true;
+  const script = path.join(PKG_ROOT, "scripts", "hermes-link.py");
+  const failed: Array<{ profile: string; error: string }> = [];
+  let done = 0;
+  try {
+    // a few at a time: every one starts Hermes' Python
+    const queue = [...todo];
+    await Promise.all(Array.from({ length: Math.min(4, queue.length) }, async () => {
+      for (let p = queue.shift(); p; p = queue.shift()) {
+        const r = await linkHermesProfile(p, action === "link" ? { action, url: hermesMcpUrl(p), token: hermesKey(p) } : { action }, script);
+        if (r.ok) done++; else failed.push({ profile: p, error: r.error ?? "failed" });
+      }
+    }));
+  } finally { hermesLinking = false; }
+  res.json({ ok: !failed.length, action, done, failed });
+});
 app.get("/api/hermes/import", (req, res) => {
   const orgFile = clean(req.query.orgFile, 500) || guessHermesOrgFile(PKG_ROOT) || "";
   const org = readHermesOrg(orgFile);

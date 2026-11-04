@@ -371,7 +371,8 @@
       "profileBody": "Bu çalışan Hermes profili «{profile}». Modeli, hafızası, becerileri ve araçları Hermes'te ayarlı; bu metin yalnızca ofisin ona notu.",
       "fallbackOffice": "Hermes ajanları",
       "orgUnreadable": "Organizasyon dosyası okunamadı: {file}",
-      "noProfiles": "Hiç Hermes profili bulunamadı."
+      "noProfiles": "Hiç Hermes profili bulunamadı.",
+      "linkBusy": "Bağlama zaten sürüyor."
     }
   },
   "rooms": {
@@ -4886,7 +4887,17 @@
           "orgPh": "org.json yolu",
           "preview": "{offices} ofiste {profiles} profil · {missing} tanesi henüz ofiste değil",
           "done": "{added} çalışan eklendi, {offices} yeni ofis.",
-          "none": "Tüm Hermes profilleri zaten ofiste."
+          "none": "Tüm Hermes profilleri zaten ofiste.",
+          "linkTitle": "Hermes'te ofis araçları",
+          "linkStatus": "{profiles} ajandan {linked} tanesinde ofis araçları var (meslektaşlara mesaj, pano).",
+          "link": "Ofis araçlarını bağla",
+          "unlink": "Ofis araçlarını kaldır",
+          "linking": "Çalışıyor…",
+          "linkConfirm": "Bu, ofisteki her Hermes ajanının ayarlarına ofis araçlarını ekler: config.yaml'a bir giriş ve .env'e bir anahtar. İkisinin yedeği profilin .pixel-office-backup klasöründe tutulur. Devam edilsin mi?",
+          "unlinkConfirm": "Ofis araçları ofisteki tüm Hermes ajanlarından kaldırılsın mı? (yedek tutulur)",
+          "linkDone": "{done} ajan için tamam.",
+          "linkFailed": "{n} tanesi değiştirilemedi: {list}",
+          "linkHint": "Hermes araçları bir sonraki konuşmada alır. Ofis açıkken Telegram veya Hermes Desktop'taki ajanlar da kullanabilir."
         }
       },
       "shutdownHint": "Sunucuyu durdurur. Devam eden işler kesilir; sohbetler, hafızalar ve yetenekler diskte kalır."

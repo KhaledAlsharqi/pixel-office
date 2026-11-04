@@ -371,7 +371,8 @@
       "profileBody": "This employee is the Hermes profile «{profile}». Its model, memory, skills and tools are set in Hermes; this text is only the office's note to it.",
       "fallbackOffice": "Hermes agents",
       "orgUnreadable": "Could not read the org file: {file}",
-      "noProfiles": "No Hermes profiles were found."
+      "noProfiles": "No Hermes profiles were found.",
+      "linkBusy": "Linking is already running."
     }
   },
   "rooms": {
@@ -4941,7 +4942,17 @@
           "orgPh": "path to org.json",
           "preview": "{profiles} profiles in {offices} offices · {missing} not in the office yet",
           "done": "{added} employees added, {offices} new offices.",
-          "none": "Every Hermes profile is already in the office."
+          "none": "Every Hermes profile is already in the office.",
+          "linkTitle": "Office tools in Hermes",
+          "linkStatus": "{linked} of {profiles} agents have the office tools (messages to colleagues, the board).",
+          "link": "Link office tools",
+          "unlink": "Remove office tools",
+          "linking": "Working…",
+          "linkConfirm": "This adds the office tools to the settings of every Hermes agent in the office: one entry in its config.yaml and a key in its .env. A backup of both is kept in the profile's .pixel-office-backup folder. Continue?",
+          "unlinkConfirm": "Remove the office tools from every Hermes agent in the office? (a backup is kept)",
+          "linkDone": "Done for {done} agents.",
+          "linkFailed": "{n} could not be changed: {list}",
+          "linkHint": "Hermes picks the tools up in its next conversation. Agents on Telegram or Hermes Desktop can use them too while the office is running."
         }
       },
       "shutdownHint": "Stops the server. Running work is interrupted; chats, memories and skills stay on disk."

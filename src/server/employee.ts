@@ -18,7 +18,7 @@ import { t, tget, getSettings } from "./runtime.js";
 import { officeServer, OFFICE_TOOLS, type Colleagues } from "./office-tools.js";
 import { runCodexTurn, skillsIndex, skillFile, type CodexItem } from "./codex.js";
 import { runGeminiTurn, type GeminiEvent } from "./gemini.js";
-import { runHermesTurn, hermesProfileOf, hermesToolAs } from "./hermes.js";
+import { runHermesTurn, hermesProfileOf, hermesToolAs, hermesLinked, hermesTurnStarted, hermesTurnEnded } from "./hermes.js";
 import { costOf } from "./prices.js";
 import { statusDigest } from "./digest.js";
 import { engineOf, geminiKey, openrouterCatalog, openrouterCostOf, openrouterEnv, openrouterSlug, markAuthFailed, AUTH_ERROR, type Engine } from "./providers.js";
@@ -1346,7 +1346,12 @@ export class Employee extends EventEmitter {
         const task = taskId !== undefined ? this.colleagues?.board().tasks.find((x) => x.id === taskId) : undefined;
         const session = key === "side" ? undefined : taskId !== undefined ? task?.session : this.sessionId;
         const others = this.colleagues?.list().filter((e) => e !== this) ?? [];
-        const instructions = [this.cfg.systemPrompt, tt("server.hermes.officeNote", "You are working through the boss's office (Pixel Office). Colleagues in this office:\n{list}\n\nThe office tools (message_colleague, the board) are not wired into Hermes: answer here, and when part of a request belongs to a colleague, say who, so the boss can pass it on.", { list: others.map((e) => `- ${e.cfg.name} — ${e.cfg.role}`).join("\n") || "-" })].join("\n\n");
+        const profile = hermesProfileOf(this.cfg.model!);
+        const list = others.map((e) => `- ${e.cfg.name} — ${e.cfg.role}${e.cfg.manager ? " — " + t("server.board.managerTag") : ""}`).join("\n");
+        // with the office tools linked into the profile it works like any colleague (messages, board); without them, a short note
+        const instructions = hermesLinked(profile)
+          ? [this.cfg.systemPrompt, ...(others.length ? [t("server.office.prompt", { list })] : []), ...(this.colleagues ? [t(this.cfg.manager ? "server.board.promptManager" : "server.board.prompt")] : [])].join("\n\n")
+          : [this.cfg.systemPrompt, tt("server.hermes.officeNote", "You are working through the boss's office (Pixel Office). Colleagues in this office:\n{list}\n\nThe office tools (message_colleague, the board) are not wired into Hermes: answer here, and when part of a request belongs to a colleague, say who, so the boss can pass it on.", { list: others.map((e) => `- ${e.cfg.name} — ${e.cfg.role}`).join("\n") || "-" })].join("\n\n");
         const hash = crypto.createHash("sha1").update(instructions).digest("hex");
         const prompt = (!session || this.gmInstr.get(session) !== hash ? tt("server.hermes.instructions", "<instructions from the office — follow them for this whole conversation>\n{text}\n</instructions>", { text: instructions }) + "\n\n" : "") + (text || "-");
         const started = Date.now();
@@ -1354,8 +1359,9 @@ export class Employee extends EventEmitter {
         let said = "";
         const flush = () => { if (said.trim()) { this.emit("chunk_end"); this.push({ role: "assistant", text: said, ts: Date.now() }); } said = ""; };
         const mode = this.cfg.permissionMode ?? "default";
+        hermesTurnStarted(profile, this);
         const run = runHermesTurn({
-          cwd: this.cfg.cwd, profile: hermesProfileOf(this.cfg.model!), prompt, session, image: files[0],
+          cwd: this.cfg.cwd, profile, prompt, session, image: files[0],
           yolo: mode === "bypassPermissions" && !this.meetingTurn,
           promptFile: path.join(os.tmpdir(), "pixel-office", `hermes-${this.cfg.officeId}-${this.cfg.id}-${Date.now()}.txt`),
         }, {
@@ -1377,7 +1383,7 @@ export class Employee extends EventEmitter {
           onToolError: (name, output) => { if (this.generation === gen) this.push({ role: "activity", text: tt("server.hermes.toolFailed", "Hermes: {tool} failed — {detail}", { tool: name, detail: output }), ts: Date.now() }); },
         });
         this.cx = { kill: run.kill };
-        const res = await run.done;
+        const res = await run.done.finally(() => hermesTurnEnded(profile, this));
         if (this.generation !== gen) return;
         flush();
         if (res.ok) {

@@ -2,7 +2,12 @@ import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import type { Employee } from "./employee.js";
 import { TASK_STATUSES, type Board, type Task } from "./board.js";
-import { slug } from "./agents.js";
+import { slug as asciiSlug } from "./agents.js";
+// A name as a lookup key. slug() keeps only Latin letters and digits, so every Arabic (or other non-Latin) name became ""
+// and matched the first colleague: such names are compared as written instead, ignoring diacritics, tatweel and the
+// alef / yaa / taa-marbuta spellings people mix up.
+const slug = (s: string) => asciiSlug(s) || s.normalize("NFKC").toLowerCase().replace(/[\u064B-\u065F\u0670\u0640]/g, "")
+  .replace(/[\u0623\u0625\u0622\u0671]/g, "\u0627").replace(/\u0649/g, "\u064A").replace(/\u0629/g, "\u0647").replace(/[\s_@-]+/g, " ").trim();
 import fs from "node:fs";
 import { writeFileAtomicSync } from "./fsutil.js";
 import { t } from "./runtime.js";

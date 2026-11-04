@@ -273,3 +273,70 @@ export function hermesToolAs(name: string, input: Record<string, unknown> = {}):
   const hit = map[name];
   return hit ? { name: hit[0], input: hit[1] } : { name, input };
 }
+
+// ---- office tools for Hermes ("link") ----
+// Hermes reads its MCP servers from each profile's config.yaml. Linking adds one entry there, written by Hermes' own config code
+// (scripts/hermes-link.py, the same save path `hermes mcp add` uses), with a backup of config.yaml and .env first:
+//   mcp_servers.office = { url: http://127.0.0.1:<port>/mcp-hermes/<profile>, headers: { Authorization: Bearer ${MCP_OFFICE_API_KEY} } }
+// The key itself goes to the profile's .env, as Hermes keeps every MCP secret. Tools then arrive as mcp__office__<tool>, the
+// same names Claude employees use. The address and key never change (they come from a secret kept in the office's data
+// folder), so the entry keeps working across restarts; when the office is not running Hermes just reports the server as down.
+export const HERMES_MCP_NAME = "office";
+
+/** Hermes' source folder (it holds hermes_bootstrap.py): $HERMES_REPO, else <home>/hermes-agent. */
+export function hermesRepo(): string {
+  const env = process.env.HERMES_REPO?.trim();
+  return env ? expand(env) : path.join(hermesHome(), "hermes-agent");
+}
+/** The Python of Hermes' own venv, next to the hermes command; `python` as a last resort. */
+export function hermesPython(): string {
+  const bin = hermesBin();
+  const dir = path.dirname(bin);
+  const cands = process.platform === "win32" ? [path.join(dir, "python.exe"), path.join(hermesRepo(), "venv", "Scripts", "python.exe")] : [path.join(dir, "python3"), path.join(dir, "python"), path.join(hermesRepo(), "venv", "bin", "python3")];
+  return cands.find((c) => path.isAbsolute(c) && fs.existsSync(c)) ?? (process.platform === "win32" ? "python" : "python3");
+}
+export const profileDir = (profile: string) => (profile === "default" ? hermesHome() : path.join(hermesHome(), "profiles", profile));
+
+const linkedCache = new Map<string, { at: number; on: boolean }>();
+/** Whether this profile's config.yaml has the office tools entry (cached for half a minute). */
+export function hermesLinked(profile: string): boolean {
+  const c = linkedCache.get(profile);
+  if (c && Date.now() - c.at < 30e3) return c.on;
+  const cfg = readYamlMap(path.join(profileDir(profile), "config.yaml"));
+  const office = ((cfg.mcp_servers ?? {}) as Record<string, unknown>)[HERMES_MCP_NAME] as Record<string, unknown> | undefined;
+  const on = !!office && str(office.url).includes("/mcp-hermes/") && !/^(false|no|off|0)$/i.test(str(office.enabled));
+  linkedCache.set(profile, { at: Date.now(), on });
+  return on;
+}
+
+/** Adds (or removes) the office entry in one profile, through Hermes' own Python. */
+export function linkHermesProfile(profile: string, req: { action: "link" | "unlink"; url?: string; token?: string }, script: string): Promise<{ ok: boolean; error?: string }> {
+  linkedCache.delete(profile);
+  return new Promise((resolve) => {
+    const env = { ...hermesEnv(), HERMES_HOME: profileDir(profile) };
+    let child: ChildProcess;
+    try { child = spawn(hermesPython(), [script, hermesRepo()], { stdio: ["pipe", "pipe", "pipe"], env, windowsHide: true }); }
+    catch (e) { resolve({ ok: false, error: (e as Error).message }); return; }
+    let out = "", err = "";
+    const timer = setTimeout(() => { killTree(child); resolve({ ok: false, error: "timeout" }); }, 120000);
+    child.stdout?.setEncoding("utf8"); child.stderr?.setEncoding("utf8");
+    child.stdout?.on("data", (d: string) => { out += d; });
+    child.stderr?.on("data", (d: string) => { err = (err + d).slice(-4000); });
+    child.on("error", (e) => { clearTimeout(timer); resolve({ ok: false, error: e.message }); });
+    child.on("close", () => {
+      clearTimeout(timer);
+      linkedCache.delete(profile);
+      const line = out.trim().split(/\r?\n/).reverse().find((l) => l.startsWith("{"));
+      try { const r = JSON.parse(line ?? "") as { ok?: boolean; error?: string }; resolve({ ok: !!r.ok, error: r.error }); }
+      catch { resolve({ ok: false, error: lastError(err) || "no answer from hermes-link.py" }); }
+    });
+    child.stdin?.end(JSON.stringify({ ...req, name: HERMES_MCP_NAME }));
+  });
+}
+
+// Which employee is running a Hermes turn for a profile right now: the office tools a profile calls act as that employee
+// (a profile can sit in several offices). Outside a turn (Telegram, Hermes Desktop) they act as its first employee.
+const activeTurns = new Map<string, unknown[]>();
+export function hermesTurnStarted(profile: string, who: unknown) { const l = activeTurns.get(profile) ?? []; l.push(who); activeTurns.set(profile, l); }
+export function hermesTurnEnded(profile: string, who: unknown) { const l = (activeTurns.get(profile) ?? []).filter((x) => x !== who); if (l.length) activeTurns.set(profile, l); else activeTurns.delete(profile); }
+export const hermesActiveFor = (profile: string): unknown => activeTurns.get(profile)?.at(-1);

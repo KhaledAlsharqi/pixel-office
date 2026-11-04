@@ -5,6 +5,7 @@ import { execFile, spawn } from "node:child_process";
 import { readRawConfig, writeRawConfig, type Root } from "./config.js";
 import { readJsonSafe } from "./fsutil.js";
 import { codexModels } from "./codex.js";
+import { HERMES_PREFIX, hermesModels, probeHermes } from "./hermes.js";
 
 // The LLM providers an employee can run on, managed from Settings → Models. Each one is "active" when the boss has it switched
 // on AND it is connected (installed and signed in, or an API key is there); only active providers' models can be given to an
@@ -14,10 +15,11 @@ import { codexModels } from "./codex.js";
 //   gemini      the Gemini CLI, one process per turn (gemini.ts), with a Gemini API key
 //   openrouter  the Claude Agent SDK pointed at OpenRouter's Anthropic-compatible endpoint: any model OpenRouter serves, with
 //               the same tools, permissions and sessions as a Claude employee
+//   hermes      Hermes Agent, one process per turn (hermes.ts): every Hermes profile is a "model" (hermes:<profile>)
 // On/off switches and model lists live in config.json (`providers`); API keys in <dataDir>/secrets.json (0600), which is
 // never in git, not even in project mode, where config.json is.
 
-export const PROVIDERS = ["claude", "codex", "gemini", "openrouter"] as const;
+export const PROVIDERS = ["claude", "codex", "gemini", "openrouter", "hermes"] as const;
 export type ProviderId = (typeof PROVIDERS)[number];
 export type Engine = ProviderId;
 
@@ -54,6 +56,7 @@ export const OPENROUTER_BASE = "https://openrouter.ai/api";
 export function engineOf(model?: string): Engine {
   if (!model) return "claude";
   if (model.startsWith(OPENROUTER_PREFIX)) return "openrouter";
+  if (model.startsWith(HERMES_PREFIX)) return "hermes";
   if (/^gemini-/.test(model)) return "gemini";
   if (codexModels().some((m) => m.id === model) || /^(gpt-|codex-)/.test(model)) return "codex";
   return "claude";
@@ -216,7 +219,7 @@ async function probeOpenRouter(): Promise<Probe> {
     return { connected: false, installed: true, version: "", detail: `offline:${(err as Error).message.slice(0, 80)}` };
   }
 }
-const PROBES: Record<ProviderId, (fresh: boolean) => Promise<Probe>> = { claude: probeClaude, codex: probeCodex, gemini: probeGemini, openrouter: probeOpenRouter };
+const PROBES: Record<ProviderId, (fresh: boolean) => Promise<Probe>> = { claude: probeClaude, codex: probeCodex, gemini: probeGemini, openrouter: probeOpenRouter, hermes: probeHermes };
 
 const probed = new Map<ProviderId, { at: number; value: Probe }>();
 const inflight = new Map<ProviderId, Promise<Probe>>();
@@ -237,6 +240,7 @@ function modelsOf(id: ProviderId): ModelEntry[] {
   const custom = cfgOf(id).models ?? [];
   if (id === "claude") return [...CLAUDE_MODELS].map((m) => ({ id: m, name: m, desc: "", provider: id }));
   if (id === "codex") return codexModels().map((m) => ({ id: m.id, name: m.name, desc: m.desc, provider: id }));
+  if (id === "hermes") return hermesModels();
   if (id === "gemini") {
     const known = new Set(GEMINI_MODELS.map(([m]) => m));
     return [...GEMINI_MODELS.map(([m, name]) => ({ id: m, name, desc: "", provider: id })), ...custom.filter((m) => !known.has(m)).map((m) => ({ id: m, name: m, desc: "", provider: id }))];

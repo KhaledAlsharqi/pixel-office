@@ -363,6 +363,15 @@
       "liveYes": "after the last commit, so it runs it",
       "liveNo": "before the last commit, so it does not run it yet",
       "rule": "When asked about the state, trust this summary and the board, not what you knew at the start of the session. If you cannot verify something, do not guess: say you could not verify it."
+    },
+    "hermes": {
+      "instructions": "<instructions from the office — follow them for this whole conversation>\n{text}\n</instructions>",
+      "officeNote": "You are working through the boss's office (Pixel Office). Colleagues in this office:\n{list}\n\nThe office tools (message_colleague, the board) are not wired into Hermes: answer here, and when part of a request belongs to a colleague, say who, so the boss can pass it on.",
+      "toolFailed": "Hermes: {tool} failed — {detail}",
+      "profileBody": "This employee is the Hermes profile «{profile}». Its model, memory, skills and tools are set in Hermes; this text is only the office's note to it.",
+      "fallbackOffice": "Hermes agents",
+      "orgUnreadable": "Could not read the org file: {file}",
+      "noProfiles": "No Hermes profiles were found."
     }
   },
   "rooms": {
@@ -4871,6 +4880,10 @@
           "openrouter": {
             "name": "OpenRouter",
             "desc": "Any model OpenRouter serves, with an OpenRouter API key."
+          },
+          "hermes": {
+            "name": "Hermes",
+            "desc": "Hermes Agent: every Hermes profile becomes an employee, with its own model, memory and tools."
           }
         },
         "state": {
@@ -4881,7 +4894,9 @@
           "badKey": "The API key was refused.",
           "apiKey": "API key",
           "offline": "Could not reach the service: {detail}",
-          "error": "Check failed: {detail}"
+          "error": "Check failed: {detail}",
+          "profiles": "{detail} Hermes profiles found.",
+          "noProfiles": "Hermes is installed, but no profiles were found."
         },
         "warn": "The CLI's settings file has something it cannot read ({detail}). It still works, but prints a warning.",
         "install": "Install",
@@ -4917,7 +4932,17 @@
           "unavailable": "Prices unavailable: {message}"
         },
         "customSave": "Save models",
-        "version": "version {v}"
+        "version": "version {v}",
+        "hermes": {
+          "import": "Import Hermes agents",
+          "importing": "Importing…",
+          "hint": "Adds every Hermes profile as an employee. With an org file (offices and titles), each company gets its own office.",
+          "org": "Org file (optional)",
+          "orgPh": "path to org.json",
+          "preview": "{profiles} profiles in {offices} offices · {missing} not in the office yet",
+          "done": "{added} employees added, {offices} new offices.",
+          "none": "Every Hermes profile is already in the office."
+        }
       },
       "shutdownHint": "Stops the server. Running work is interrupted; chats, memories and skills stay on disk."
     },

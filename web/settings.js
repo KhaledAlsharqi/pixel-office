@@ -156,7 +156,7 @@ const settingsUI = (() => {
   function stateText(p) {
     if (!p.installed && p.canInstall) return escapeHtml(t("ui.settings.models.state.missing"));
     const [code, ...rest] = String(p.detail || "").split(":");
-    const known = ["missing", "signedOut", "needKey", "badKey", "authExpired", "offline", "error"];
+    const known = ["missing", "signedOut", "needKey", "badKey", "authExpired", "offline", "error", "profiles", "noProfiles"];
     if (known.includes(code)) return escapeHtml(t(`ui.settings.models.state.${code}`, { detail: rest.join(":") }));
     if (code.startsWith("http")) return escapeHtml(t("ui.settings.models.state.error", { detail: p.detail }));
     return escapeHtml(p.detail || "");
@@ -166,7 +166,7 @@ const settingsUI = (() => {
     if (!prices && !priceErr.load) loadPrices();
     if (!prov) { host.innerHTML = `<div class="muted">${escapeHtml(provError ? t("ui.settings.unavailable", { message: provError }) : t("ui.settings.loading"))}</div>`; if (!provError && !busy.size) loadProviders(); return; }
     if (host.contains(document.activeElement) && /INPUT|TEXTAREA/.test(document.activeElement.tagName)) return; // typing: do not redraw under the cursor
-    const BRAND = { claude: "#d97757", codex: "#10a37f", gemini: "#4f8ff7", openrouter: "#a78bfa" };
+    const BRAND = { claude: "#d97757", codex: "#10a37f", gemini: "#4f8ff7", openrouter: "#a78bfa", hermes: "#e5c07b" };
     const PKG = { claude: "@anthropic-ai/claude-code", codex: "@openai/codex", gemini: "@google/gemini-cli" };
     const openPrices = new Set([...host.querySelectorAll("details[data-prices][open]")].map((d) => d.dataset.prices));
     host.innerHTML = prov.providers.map((p) => {
@@ -195,7 +195,7 @@ const settingsUI = (() => {
         ${stateLine ? `<div class="prov-state">${stateLine}</div>` : ""}
         ${p.warning ? `<div class="prov-note">⚠ ${escapeHtml(t("ui.settings.models.warn", { detail: p.warning.replace(/^invalidConfig:/, "") }))}</div>` : ""}
         ${!p.installed && p.canInstall ? `<small class="muted prov-hint">${t("ui.settings.models.installHint", { pkg: PKG[p.id] })}</small>` : ""}
-        ${keyRow}${customRow}
+        ${keyRow}${customRow}${p.id === "hermes" && window.hermesImportRow ? window.hermesImportRow(p) : ""}
         <div class="prov-actions">${actions.join("")}</div>
         ${p.id === "codex" || p.id === "gemini" ? priceEditor(p.id).replace("<details ", openPrices.has(p.id) ? "<details open " : "<details ") : ""}
         <details class="prov-models"><summary>${escapeHtml(t("ui.settings.models.modelsTitle", { n: p.models.length }))}</summary><div class="prov-chips">${chips}</div></details>

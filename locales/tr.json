@@ -363,6 +363,15 @@
       "liveYes": "son committen sonra, yani onu çalıştırıyor",
       "liveNo": "son committen önce, yani henüz onu çalıştırmıyor",
       "rule": "Durum sorulduğunda bu özete ve panoya güven, oturum başındaki bilgiye değil. Doğrulayamıyorsan tahmin etme, doğrulayamadığını söyle."
+    },
+    "hermes": {
+      "instructions": "<ofisten talimatlar — bu konuşma boyunca bunlara uy>\n{text}\n</instructions>",
+      "officeNote": "Patronun ofisi (Pixel Office) üzerinden çalışıyorsun. Bu ofisteki meslektaşların:\n{list}\n\nOfis araçları (message_colleague, pano) Hermes'e bağlı değil: burada yanıtla ve bir isteğin bir kısmı bir meslektaşa aitse kime ait olduğunu söyle ki patron iletebilsin.",
+      "toolFailed": "Hermes: {tool} başarısız — {detail}",
+      "profileBody": "Bu çalışan Hermes profili «{profile}». Modeli, hafızası, becerileri ve araçları Hermes'te ayarlı; bu metin yalnızca ofisin ona notu.",
+      "fallbackOffice": "Hermes ajanları",
+      "orgUnreadable": "Organizasyon dosyası okunamadı: {file}",
+      "noProfiles": "Hiç Hermes profili bulunamadı."
     }
   },
   "rooms": {
@@ -4816,6 +4825,10 @@
           "openrouter": {
             "name": "OpenRouter",
             "desc": "OpenRouter'ın sunduğu her model, bir OpenRouter API anahtarıyla."
+          },
+          "hermes": {
+            "name": "Hermes",
+            "desc": "Hermes Agent: her Hermes profili kendi modeli, hafızası ve araçlarıyla bir çalışan olur."
           }
         },
         "state": {
@@ -4826,7 +4839,9 @@
           "badKey": "API anahtarı reddedildi.",
           "apiKey": "API anahtarı",
           "offline": "Servise ulaşılamadı: {detail}",
-          "error": "Kontrol başarısız: {detail}"
+          "error": "Kontrol başarısız: {detail}",
+          "profiles": "{detail} Hermes profili bulundu.",
+          "noProfiles": "Hermes kurulu ama hiç profil bulunamadı."
         },
         "warn": "CLI'ın ayar dosyasında okuyamadığı bir yer var ({detail}). Çalışır ama uyarı basar.",
         "install": "Kur",
@@ -4862,7 +4877,17 @@
           "unavailable": "Fiyatlar alınamadı: {message}"
         },
         "customSave": "Modelleri kaydet",
-        "version": "sürüm {v}"
+        "version": "sürüm {v}",
+        "hermes": {
+          "import": "Hermes ajanlarını içe aktar",
+          "importing": "İçe aktarılıyor…",
+          "hint": "Her Hermes profilini çalışan olarak ekler. Bir organizasyon dosyasıyla (ofisler ve unvanlar) her şirket kendi ofisini alır.",
+          "org": "Organizasyon dosyası (isteğe bağlı)",
+          "orgPh": "org.json yolu",
+          "preview": "{offices} ofiste {profiles} profil · {missing} tanesi henüz ofiste değil",
+          "done": "{added} çalışan eklendi, {offices} yeni ofis.",
+          "none": "Tüm Hermes profilleri zaten ofiste."
+        }
       },
       "shutdownHint": "Sunucuyu durdurur. Devam eden işler kesilir; sohbetler, hafızalar ve yetenekler diskte kalır."
     },

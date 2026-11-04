@@ -19,6 +19,8 @@ import { officeToolDefs } from "./office-tools.js";
 import { initSkills, skillCatalog, viewOfSkill, skillById, previewSkill, installSkill, uninstallSkill, installedIds } from "./skills.js";
 import { CATEGORIES, initIntegrations, listIntegrations, saveIntegration, checkIntegration, removeIntegration, entryOf, startOAuth, finishOAuth, addCustom, gateway, setOwnClient } from "./integrations.js";
 import { CLAUDE_MODELS, PROVIDERS, activeModels, isActiveModel, initProviders, providersReady, providerStatuses, updateProvider, installProvider, loginProvider, refreshProvider, canInstall, canLogin, type ProviderId } from "./providers.js";
+import { HERMES_PREFIX, hermesProfileOf, planHermesImport, readHermesOrg, guessHermesOrgFile } from "./hermes.js";
+import { writeHermesEmployee } from "./hermes-import.js";
 import { createGuard, isLoopbackHost } from "./security.js";
 import { acquireLock } from "./lock.js";
 import { writeFileAtomicSync } from "./fsutil.js";
@@ -674,6 +676,72 @@ app.post("/api/providers/:id/check", async (req, res) => {
   if (!isProvider(id)) return res.status(404).json({ error: "unknown provider" });
   await refreshProvider(id);
   res.json(await providersPayload());
+});
+// ---- Hermes: every Hermes profile as an employee, placed in the offices of a Hermes org file when there is one (hermes.ts) ----
+// GET shows what an import would do; POST does it. Running it again adds only profiles that are not in the office yet.
+const hermesInOffice = () => {
+  const seen = new Map<string, string>(); // profile → its employee folder (the first office it sits in)
+  for (const o of offices.values()) for (const e of o.employees.values()) if (e.cfg.model?.startsWith(HERMES_PREFIX) && e.cfg.dir && !seen.has(hermesProfileOf(e.cfg.model))) seen.set(hermesProfileOf(e.cfg.model), e.cfg.dir);
+  return seen;
+};
+app.get("/api/hermes/import", (req, res) => {
+  const orgFile = clean(req.query.orgFile, 500) || guessHermesOrgFile(PKG_ROOT) || "";
+  const org = readHermesOrg(orgFile);
+  const plan = planHermesImport(org, t("server.hermes.fallbackOffice"));
+  const have = hermesInOffice();
+  const profiles = new Set(plan.offices.flatMap((o) => o.agents));
+  res.json({ orgFile: org ? orgFile : "", orgName: org?.name ?? "", offices: plan.offices.length, profiles: profiles.size, missing: [...profiles].filter((p) => !have.has(p)).length });
+});
+app.post("/api/hermes/import", (req, res) => {
+  const asked = clean(req.body?.orgFile, 500);
+  const orgFile = asked || guessHermesOrgFile(PKG_ROOT) || "";
+  const org = readHermesOrg(orgFile);
+  if (asked && !org) return res.status(400).json({ error: t("server.hermes.orgUnreadable", { file: asked }) });
+  const plan = planHermesImport(org, t("server.hermes.fallbackOffice"));
+  if (!plan.offices.length) return res.status(400).json({ error: t("server.hermes.noProfiles") });
+  const have = hermesInOffice();
+  const touched = new Set<OfficeRt>();
+  let added = 0, newOffices = 0;
+  for (const po of plan.offices) {
+    let o = offices.get(po.id) ?? [...offices.values()].find((x) => x.def.name === po.name);
+    if (!o) {
+      // a new office, the same way POST /api/offices makes one
+      const base = path.dirname(settings.offices[0].employeesDir);
+      let id = officeIdOf(po.id, "hermes");
+      for (let n = 2; offices.has(id) || RESERVED_OFFICE_IDS.has(id); n++) id = `${officeIdOf(po.id, "hermes")}-${n}`;
+      if (!settings.multiOffice) settings.multiOffice = true;
+      const def = officeDefFromRaw(R, { id, name: po.name || id, employeesDir: path.join(base, id), theme: pick(po.theme, THEMES) ?? "default" }, settings.offices.length, settings.offices[0].cwd);
+      settings.offices.push(def);
+      o = openOffice(def);
+      newOffices++;
+    }
+    for (const profile of po.agents) {
+      const already = [...o.employees.values()].some((e) => e.cfg.model === HERMES_PREFIX + profile);
+      if (already) continue;
+      // the first office a profile is in holds its folder; the others share it (like "employees" in config.json)
+      let dir = have.get(profile);
+      if (dir) { if (!o.def.extraEmployees.includes(dir)) o.def.extraEmployees.push(dir); }
+      else { dir = writeHermesEmployee(o.def, profile, plan.titles[profile] || profile, (po.name || profile).slice(0, 60)); have.set(profile, dir); }
+      const cfg = loadEmployee(dir, o.employees.size, o.def);
+      if (o.employees.has(cfg.id)) continue;
+      const e = new Employee(cfg, o.store);
+      e.setColleagues(colleaguesOf(o));
+      o.employees.set(e.cfg.id, e);
+      wire(e);
+      logEvent(o, { kind: "hired", emp: e.cfg.id, by: "user", data: {} });
+      touched.add(o);
+      added++;
+    }
+  }
+  for (const o of touched) {
+    syncAgents(o);
+    o.layout.ensure([...o.employees.keys()]);
+    broadcast({ type: "layout", office: o.def.id, layout: o.layout.doc });
+    broadcast({ type: "roster", office: o.def.id, employees: roster(o) });
+  }
+  persistOffices();
+  broadcast(officesPayload());
+  res.json({ ok: true, added, offices: newOffices });
 });
 // Token prices for Codex and Gemini turns (USD per 1M tokens). The user's rows go in front of the built-in ones, first match
 // wins; PUT replaces the user's rows of the engines it names ({"codex": []} clears them).

@@ -377,7 +377,8 @@
         "gateway": "Hermes ağ geçidi çalışmıyor ve Hermes onu başlatamadı. PowerShell'de çalıştır: hermes gateway install, sonra hermes gateway start.",
         "exhausted": "Modelin aboneliği ya da kredisi şimdilik bitti; bekleme süresinden sonra geri gelir (ya da profilin modelini değiştir).",
         "auth": "Bu profilin model sağlayıcısında oturumun süresi doldu: Hermes'te yeniden giriş yap (hermes auth).",
-        "rate": "Sağlayıcının hız sınırına takıldı: biraz sonra yeniden dene."
+        "rate": "Sağlayıcının hız sınırına takıldı: biraz sonra yeniden dene.",
+        "elevated": "Hermes ağ geçidi yönetici olarak başlatıldı, bu yüzden ofis (yönetici olmadan) ona ulaşamıyor. Yönetici olarak açılmış bir PowerShell'de durdur (hermes gateway stop), sonra normal bir PowerShell'de başlat (hermes gateway start)."
       }
     },
     "groups": {

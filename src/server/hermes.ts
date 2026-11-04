@@ -122,6 +122,7 @@ export async function probeHermes(): Promise<{ connected: boolean; installed: bo
 
 // Hermes errors people meet, said in their language with what to do; the original stays in brackets.
 const KNOWN_ERRORS: Array<[RegExp, string]> = [
+  [/gateway_elevated|started as administrator/i, "elevated"],
   [/gateway (inaccessible|absent|unavailable|draining)|service_identity_unverified|no gateway process|profile_parked|service_(failed|start_failed|disabled|masked|account_mismatch)/i, "gateway"],
   [/exhausted|cooldown|insufficient_quota|usage limit|quota exceeded/i, "exhausted"],
   [/\b401\b|unauthori[sz]ed|refresh token|invalid[_ ]api[_ ]key|sign in again|log ?in again|credentials? (expired|invalid)/i, "auth"],

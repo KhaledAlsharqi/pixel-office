@@ -377,7 +377,8 @@
         "gateway": "Hermes' gateway is not running and Hermes could not start it. In PowerShell run: hermes gateway install, then hermes gateway start.",
         "exhausted": "The model's subscription or credit is used up for now; it comes back after the cooldown (or switch the profile's model).",
         "auth": "The sign-in of this profile's model provider has expired: sign in again in Hermes (hermes auth).",
-        "rate": "The provider's rate limit was hit: try again in a little while."
+        "rate": "The provider's rate limit was hit: try again in a little while.",
+        "elevated": "Hermes' gateway was started as administrator, so the office (not elevated) cannot reach it. Stop it from a PowerShell opened as administrator (hermes gateway stop), then start it from a normal PowerShell (hermes gateway start)."
       }
     },
     "groups": {

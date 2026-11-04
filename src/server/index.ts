@@ -733,14 +733,18 @@ app.post("/api/hermes/import", (req, res) => {
       added++;
     }
   }
+  persistOffices();
+  // the new offices first, then what an open page otherwise only gets when it connects (board, progress): without them a
+  // new office would show no board mode, coins or XP until the page is reloaded
+  broadcast(officesPayload());
   for (const o of touched) {
     syncAgents(o);
     o.layout.ensure([...o.employees.keys()]);
     broadcast({ type: "layout", office: o.def.id, layout: o.layout.doc });
     broadcast({ type: "roster", office: o.def.id, employees: roster(o) });
+    broadcast({ type: "board", office: o.def.id, board: boardPayload(o) });
+    broadcast({ type: "progress", office: o.def.id, progress: o.progress.state() });
   }
-  persistOffices();
-  broadcast(officesPayload());
   res.json({ ok: true, added, offices: newOffices });
 });
 // Token prices for Codex and Gemini turns (USD per 1M tokens). The user's rows go in front of the built-in ones, first match

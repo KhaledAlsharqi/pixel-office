@@ -1,0 +1,133 @@
+/* Right-to-left support (Arabic, Persian, Hebrew, Urdu).
+   Loaded by shared.js only when the office language is RTL; it adds no rules in other languages.
+   Panels keep their physical places (the chat stays docked on the right, the start side in RTL);
+   text, rows and alignment follow the reading direction. Kept in its own file so upstream updates
+   of the other stylesheets merge without conflicts. */
+
+/* IBM Plex Sans Arabic (SIL OFL 1.1, see fonts/plex-sans-arabic/LICENSE.txt), bundled so it works offline.
+   Only Arabic letters use it (unicode-range); Latin text keeps IBM Plex Mono. Also used by the speech bubbles. */
+@font-face { font-family: "IBM Plex Sans Arabic"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/plex-sans-arabic/ibm-plex-sans-arabic-arabic-400-normal.woff2") format("woff2"); unicode-range: U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC; }
+@font-face { font-family: "IBM Plex Sans Arabic"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/plex-sans-arabic/ibm-plex-sans-arabic-arabic-500-normal.woff2") format("woff2"); unicode-range: U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC; }
+@font-face { font-family: "IBM Plex Sans Arabic"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/plex-sans-arabic/ibm-plex-sans-arabic-arabic-600-normal.woff2") format("woff2"); unicode-range: U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC; }
+@font-face { font-family: "IBM Plex Sans Arabic"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/plex-sans-arabic/ibm-plex-sans-arabic-arabic-700-normal.woff2") format("woff2"); unicode-range: U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC; }
+
+/* The same Arabic files are also registered under the office's own font names, limited to Arabic letters. Every element and
+   the canvas that asks for IBM Plex Mono or Silkscreen then draws Arabic with Plex Sans Arabic, with no per-element rules. */
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/plex-sans-arabic/ibm-plex-sans-arabic-arabic-400-normal.woff2") format("woff2"); unicode-range: U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC; }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/plex-sans-arabic/ibm-plex-sans-arabic-arabic-600-normal.woff2") format("woff2"); unicode-range: U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC; }
+@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/plex-sans-arabic/ibm-plex-sans-arabic-arabic-700-normal.woff2") format("woff2"); unicode-range: U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC; }
+@font-face { font-family: "Silkscreen"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/plex-sans-arabic/ibm-plex-sans-arabic-arabic-400-normal.woff2") format("woff2"); unicode-range: U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC; }
+@font-face { font-family: "Silkscreen"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/plex-sans-arabic/ibm-plex-sans-arabic-arabic-600-normal.woff2") format("woff2"); unicode-range: U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC; }
+@font-face { font-family: "Silkscreen"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/plex-sans-arabic/ibm-plex-sans-arabic-arabic-700-normal.woff2") format("woff2"); unicode-range: U+0600-06FF,U+0750-077F,U+0870-088E,U+0890-0891,U+0897-08E1,U+08E3-08FF,U+200C-200E,U+2010-2011,U+204F,U+2E41,U+FB50-FDFF,U+FE70-FE74,U+FE76-FEFC; }
+
+:root[dir="rtl"] {
+  --rtl-font: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+}
+
+/* Latin keeps IBM Plex Mono; Arabic letters fall through to IBM Plex Sans Arabic. */
+:root[dir="rtl"] body,
+:root[dir="rtl"] input,
+:root[dir="rtl"] textarea,
+:root[dir="rtl"] select,
+:root[dir="rtl"] button {
+  font-family: "IBM Plex Mono", var(--rtl-font), ui-monospace, monospace;
+}
+:root[dir="rtl"] .brand,
+:root[dir="rtl"] .clock {
+  font-family: "Silkscreen", var(--rtl-font), monospace;
+  letter-spacing: 0;
+}
+/* Arabic script needs a little more line height than the monospace default */
+:root[dir="rtl"] body { line-height: 1.6; }
+
+/* The office map is a picture: keep it unmirrored. Names over the characters pick their own direction. */
+:root[dir="rtl"] .stage,
+:root[dir="rtl"] .office-wrap,
+:root[dir="rtl"] #office {
+  direction: ltr;
+}
+:root[dir="rtl"] .labels > * {
+  unicode-bidi: plaintext;
+}
+
+/* Messages, notes and task text may be Arabic or English: each paragraph takes the direction of its own first letter. */
+:root[dir="rtl"] .chat-body,
+:root[dir="rtl"] .chat-body p,
+:root[dir="rtl"] .chat-body li,
+:root[dir="rtl"] textarea,
+:root[dir="rtl"] input[type="text"],
+:root[dir="rtl"] input:not([type]),
+:root[dir="rtl"] .task-drawer,
+:root[dir="rtl"] .idea-card,
+:root[dir="rtl"] .timeline {
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+
+/* Code, paths, ids and commands always read left to right. */
+:root[dir="rtl"] code,
+:root[dir="rtl"] pre,
+:root[dir="rtl"] kbd,
+:root[dir="rtl"] samp {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: left;
+}
+
+/* Buttons and rows that were explicitly aligned left now align to the start (the right). */
+:root[dir="rtl"] .menu-item,
+:root[dir="rtl"] .meet-mentions button,
+:root[dir="rtl"] .history-list button,
+:root[dir="rtl"] .ask-opt,
+:root[dir="rtl"] .choice,
+:root[dir="rtl"] .ig-cat,
+:root[dir="rtl"] .ig-chip,
+:root[dir="rtl"] .ig-card,
+:root[dir="rtl"] .ig-tile,
+:root[dir="rtl"] .ctable td:first-child,
+:root[dir="rtl"] .srow,
+:root[dir="rtl"] .guide-sec-btn,
+:root[dir="rtl"] .ptable th,
+:root[dir="rtl"] .mk-own,
+:root[dir="rtl"] .sh-aisle,
+:root[dir="rtl"] .sh-col,
+:root[dir="rtl"] .mk-open {
+  text-align: right;
+}
+
+/* On/off switches: the knob animation is drawn for left-to-right, so keep the switch itself LTR. */
+:root[dir="rtl"] label.check input[type="checkbox"] {
+  direction: ltr;
+}
+
+/* Arrows that point "forward" in text flip with the reading direction. */
+:root[dir="rtl"] .menu-caret,
+:root[dir="rtl"] .rtl-flip {
+  display: inline-block;
+  transform: scaleX(-1);
+}
+
+/* Room names and employee names on the map: Arabic letters must join, so no letter-spacing, and a touch larger. */
+:root[dir="rtl"] .room-label {
+  font-family: "Silkscreen", var(--rtl-font), monospace;
+  letter-spacing: 0;
+  font-size: 11px;
+  font-weight: 600;
+}
+:root[dir="rtl"] .label small {
+  font-family: "IBM Plex Mono", var(--rtl-font), monospace;
+}
+
+/* The send arrow points toward the start of the line. */
+:root[dir="rtl"] #btnSend,
+:root[dir="rtl"] form button[type="submit"][title="Enter"] {
+  transform: scaleX(-1);
+}
+:root[dir="rtl"] .label {
+  font-family: "Silkscreen", var(--rtl-font), monospace;
+}
+
+/* letter-spacing tears Arabic letters apart (they stop joining), so it is switched off everywhere in RTL. */
+:root[dir="rtl"] * {
+  letter-spacing: 0;
+}

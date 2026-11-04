@@ -25,6 +25,17 @@ function applyI18n(root = document) {
 }
 applyI18n();
 
+// Right-to-left languages (Arabic, …): set the page direction and load rtl.css. Nothing changes for other languages.
+(function applyDirection() {
+  const rtl = /^(ar|fa|he|ur)$/.test(String(PO.locale).split("-")[0]);
+  document.documentElement.dir = rtl ? "rtl" : "ltr";
+  if (rtl && !document.getElementById("rtlCss")) {
+    const l = document.createElement("link");
+    l.id = "rtlCss"; l.rel = "stylesheet"; l.href = "/rtl.css";
+    document.head.appendChild(l);
+  }
+})();
+
 const STATUS_T = PO.strings.status || {};
 const MODEL_INFO = (PO.strings.ui && PO.strings.ui.models) || {};
 const EFFORT_INFO = (PO.strings.ui && PO.strings.ui.efforts) || {};

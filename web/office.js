@@ -1056,7 +1056,7 @@ function wrapBalloon(text, max = 24) {
   if (out.length > 2) { out.length = 2; out[1] = out[1].slice(0, max - 1).replace(/[\s,.;:!?]+$/, "") + "…"; }
   return out;
 }
-const BALLOON_FONT = (px) => `bold ${px}px "IBM Plex Mono", ui-monospace, monospace`;
+const BALLOON_FONT = (px) => `bold ${px}px "IBM Plex Mono", "IBM Plex Sans Arabic", "Segoe UI", Tahoma, ui-monospace, monospace`; // Arabic letters fall through to Plex Sans Arabic
 // Balloon text is queued while the scene is drawn on the logical canvas and painted after it is scaled up,
 // at the real screen resolution: the boxes stay crisp pixel art and the letters stay sharp.
 const balloonTexts = [];

@@ -8,6 +8,7 @@ import type { Employee } from "./employee.js";
 import { addOfficeTools } from "./office-tools.js";
 import { t } from "./runtime.js";
 import { writeFileAtomicSync } from "./fsutil.js";
+import { slots } from "./slots.js";
 
 // Group chats ("الغروبات"), like a messaging app: the boss and employees from any office in one conversation.
 //  - The boss writes: the members named with @ answer; nobody named → the group's lead answers; @الكل / @all → everyone.
@@ -25,21 +26,8 @@ const MAX_CHAIN = 8;      // answers in a row between employees before the group
 const KEEP = 1000;        // messages kept per group
 const HISTORY_LINES = 25; // what an employee is shown of the conversation (each answer runs in a fresh short session)
 const AGENT_MENTIONS = 3; // colleagues one employee message can ask at once (@all is the boss's alone)
-// Group answers that run at the same time, across all groups: answers come in waves, so the computer and shared subscriptions are
-// not hit by a dozen agents at once, and whoever answers in a later wave sees (and does not repeat) what the earlier ones said.
-const PARALLEL = 3;
-
-class Slots {
-  private free = PARALLEL;
-  private waiting: Array<() => void> = [];
-  async take(): Promise<() => void> {
-    if (this.free > 0) this.free--;
-    else await new Promise<void>((r) => this.waiting.push(r));
-    let done = false;
-    return () => { if (done) return; done = true; const next = this.waiting.shift(); if (next) next(); else this.free++; };
-  }
-}
-const slots = new Slots();
+// Group answers run in waves (see slots.ts): the computer and shared subscriptions are not hit by a dozen agents at once, and
+// whoever answers in a later wave sees (and does not repeat) what the earlier ones said.
 
 // Waits until an employee is free (or the time runs out), without holding a slot meanwhile.
 const whenFree = (e: Employee, ms: number) => new Promise<void>((resolve) => {

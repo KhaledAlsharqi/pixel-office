@@ -148,6 +148,7 @@ export interface HermesTurn {
   prompt: string;
   session?: string;      // resume this conversation
   yolo?: boolean;        // the employee may run anything without asking (the office's "bypass" permission)
+  reasoning?: string;    // reasoning effort for this run only (none … high, xhigh, max, ultra); else the profile's setting
   image?: string;        // one picture on disk (Hermes takes one per query)
   promptFile: string;    // where the prompt is written for --query-file (no length or quoting limits)
 }
@@ -167,6 +168,7 @@ export function runHermesTurn(turn: HermesTurn, h: HermesHandlers): { done: Prom
   const args = ["-p", turn.profile, "chat", "--query-file", turn.promptFile, "--format", "stream-json", "--source", "tool"];
   if (turn.session) args.push("--resume", turn.session, "--no-restore-cwd");
   if (turn.yolo) args.push("--yolo");
+  if (turn.reasoning && /^[a-z]+$/.test(turn.reasoning)) args.push("--reasoning", turn.reasoning);
   if (turn.image) args.push("--image", turn.image);
 
   let child: ChildProcess | undefined;

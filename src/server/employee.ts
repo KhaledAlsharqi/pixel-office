@@ -680,7 +680,10 @@ export class Employee extends EventEmitter {
   get inGroupTurn() { return this.groupTurn; }
   /** The group's Stop button: a group answer being written is cut off (nothing else this employee does is touched). */
   stopGroupTurn() { if (this.groupTurn && this.busy) void this.interrupt({ task: "keep", resume: false }); }
-  async sendGroup(prompt: string, maxWaitMs = 30 * 60e3): Promise<{ text: string; error?: string; skipped?: "busy" | "meeting" }> {
+  // Hermes reasoning level for the running group / council turn ("high", "max", …); undefined = the profile's own setting
+  private turnReasoning?: string;
+  // `o.timeoutMs`: how long one answer may take (10 min for a group, longer for the advisory council); `o.reasoning`: see above
+  async sendGroup(prompt: string, maxWaitMs = 30 * 60e3, o: { timeoutMs?: number; reasoning?: string } = {}): Promise<{ text: string; error?: string; skipped?: "busy" | "meeting" }> {
     await this.whenFree(maxWaitMs);
     if (this.inMeeting) return { text: "", skipped: "meeting" };
     if (this.busy || this.side) return { text: "", skipped: "busy" };
@@ -694,14 +697,15 @@ export class Employee extends EventEmitter {
       const done = (text: string, timeout = false) => {
         if (!open) return;
         open = false; clearTimeout(timer); clearTimeout(backstop); this.off("turn", done);
-        this.meetingTurn = false; this.groupTurn = false;
+        this.meetingTurn = false; this.groupTurn = false; this.turnReasoning = undefined;
         setImmediate(() => { this.off("message", onMsg); resolve({ text: text ?? "", error: error ?? (timeout ? "timeout" : undefined) }); });
       };
       let backstop: NodeJS.Timeout | undefined;
       const timer = setTimeout(() => {
         if (this.meetingTurn && this.busy) { void this.interrupt({ task: "keep", resume: false }); backstop = setTimeout(() => done("", true), 10e3); }
         else done("", true);
-      }, 10 * 60e3);
+      }, o.timeoutMs ?? 10 * 60e3);
+      this.turnReasoning = o.reasoning;
       this.on("turn", done);
       this.on("message", onMsg);
       // no status digest: a short chat answer does not need the board and git summary (and every member would pay for it)
@@ -1405,6 +1409,7 @@ export class Employee extends EventEmitter {
         const run = runHermesTurn({
           cwd: this.cfg.cwd, profile, prompt, session, image: files[0],
           yolo: mode === "bypassPermissions" && !this.meetingTurn,
+          reasoning: this.groupTurn ? this.turnReasoning : undefined,
           promptFile: path.join(os.tmpdir(), "pixel-office", `hermes-${this.cfg.officeId}-${this.cfg.id}-${Date.now()}.txt`),
         }, {
           onSession: (id) => {

@@ -3,3 +3,6 @@ dist/
 data/
 .DS_Store
 *.log
+
+# advisory council records (full transcripts of each consultation, written by the office)
+council-reports/

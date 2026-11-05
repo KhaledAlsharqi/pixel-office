@@ -22,6 +22,7 @@ import { CLAUDE_MODELS, PROVIDERS, activeModels, isActiveModel, initProviders, p
 import { HERMES_PREFIX, hermesProfileOf, planHermesImport, readHermesOrg, guessHermesOrgFile, hermesProfiles, hermesLinked, linkHermesProfile, hermesActiveFor } from "./hermes.js";
 import { writeHermesEmployee } from "./hermes-import.js";
 import { mountGroups } from "./groups.js";
+import { mountCouncil } from "./council.js";
 import { createGuard, isLoopbackHost } from "./security.js";
 import { acquireLock } from "./lock.js";
 import { writeFileAtomicSync } from "./fsutil.js";
@@ -692,6 +693,49 @@ mountGroups(app, {
   everyone: () => [...offices.values()].map((o) => ({ office: o.def.id, officeName: o.def.name, employees: [...o.employees.values()] })),
   broadcast: (payload) => broadcast(payload),
   dataDir: settings.dataDir,
+});
+
+// ---- the advisory council: one problem, advisors on different models, blind review, the chair's report (council.ts) ----
+// An office the council can seat its people in: found by name, else made like POST /api/offices; everyone shared from their office.
+function ensureSharedOffice(name: string, people: Employee[]): string {
+  let o = [...offices.values()].find((x) => x.def.name === name);
+  if (!o) {
+    const base = path.dirname(settings.offices[0].employeesDir);
+    let id = officeIdOf("advisory-council", "council");
+    for (let n = 2; offices.has(id) || RESERVED_OFFICE_IDS.has(id); n++) id = `advisory-council-${n}`;
+    if (!settings.multiOffice) settings.multiOffice = true;
+    const def = officeDefFromRaw(R, { id, name, employeesDir: path.join(base, id), theme: "default" }, settings.offices.length, settings.offices[0].cwd);
+    settings.offices.push(def);
+    o = openOffice(def);
+  }
+  for (const p of people) {
+    if (!p.cfg.dir || [...o.employees.values()].some((e) => e.cfg.dir === p.cfg.dir)) continue;
+    if (!o.def.extraEmployees.includes(p.cfg.dir)) o.def.extraEmployees.push(p.cfg.dir);
+    const cfg = loadEmployee(p.cfg.dir, o.employees.size, o.def);
+    if (o.employees.has(cfg.id)) continue;
+    const e = new Employee(cfg, o.store);
+    e.setColleagues(colleaguesOf(o));
+    o.employees.set(e.cfg.id, e);
+    wire(e);
+  }
+  syncAgents(o);
+  o.layout.ensure([...o.employees.keys()]);
+  persistOffices();
+  broadcast(officesPayload());
+  broadcast({ type: "layout", office: o.def.id, layout: o.layout.doc });
+  broadcast({ type: "roster", office: o.def.id, employees: roster(o) });
+  broadcast({ type: "board", office: o.def.id, board: boardPayload(o) });
+  broadcast({ type: "progress", office: o.def.id, progress: o.progress.state() });
+  return o.def.id;
+}
+mountCouncil(app, {
+  employee: (office, emp) => offices.get(office)?.employees.get(emp),
+  officeName: (office) => offices.get(office)?.def.name ?? office,
+  broadcast: (payload) => broadcast(payload),
+  dataDir: settings.dataDir,
+  exportDir: path.join(PKG_ROOT, "council-reports"),
+  locale: () => locale.code,
+  ensureOffice: ensureSharedOffice,
 });
 
 // Office tools for Hermes profiles: a fixed address per profile, guarded by a key derived from a secret kept in the data folder

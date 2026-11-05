@@ -17,7 +17,19 @@
 .gr-chat-head b { font-size: 14px; }
 .gr-chat-head small { color: var(--muted); font-size: 11.5px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 520px; }
 .gr-msgs { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 4px; display: flex; flex-direction: column; gap: 8px; }
-.gr-msg { max-width: 78%; padding: 7px 11px 6px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); align-self: flex-start; font-size: 13px; line-height: 1.55; unicode-bidi: plaintext; white-space: pre-wrap; word-break: break-word; }
+.gr-msg { max-width: 78%; padding: 7px 11px 6px; border-radius: 12px; background: var(--bg-2); border: 1px solid var(--line); align-self: flex-start; font-size: 13px; line-height: 1.55; unicode-bidi: plaintext; word-break: break-word; }
+/* formatted answers (md() in shared.js): compact like a chat bubble */
+.gr-msg p { margin: 0; unicode-bidi: plaintext; }
+.gr-msg p + p { margin-top: 4px; }
+.gr-msg ul, .gr-msg ol { margin: 4px 0; padding-inline-start: 20px; }
+.gr-msg li { margin: 1px 0; unicode-bidi: plaintext; }
+.gr-msg h3, .gr-msg h4 { margin: 6px 0 2px; font-size: 13px; }
+.gr-msg pre { margin: 6px 0; padding: 8px; background: var(--bg); border-radius: 8px; overflow-x: auto; direction: ltr; text-align: left; font-size: 12px; }
+.gr-msg code { font-size: 12px; }
+.gr-msg hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+.gr-msg a { color: var(--accent); }
+.gr-stop { border-color: var(--error); color: var(--error); }
+.gr-stop:hover { background: rgba(248, 113, 113, .12); }
 .gr-msg .gr-from { display: block; font-size: 11.5px; font-weight: 700; margin-bottom: 2px; }
 .gr-msg time { display: block; font-size: 10px; color: var(--muted); margin-top: 3px; text-align: end; }
 .gr-msg.boss { align-self: flex-end; background: var(--user); border-color: transparent; }

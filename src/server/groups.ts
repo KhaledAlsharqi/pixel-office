@@ -25,6 +25,30 @@ const MAX_CHAIN = 8;      // answers in a row between employees before the group
 const KEEP = 1000;        // messages kept per group
 const HISTORY_LINES = 25; // what an employee is shown of the conversation (each answer runs in a fresh short session)
 const AGENT_MENTIONS = 3; // colleagues one employee message can ask at once (@all is the boss's alone)
+// Group answers that run at the same time, across all groups: answers come in waves, so the computer and shared subscriptions are
+// not hit by a dozen agents at once, and whoever answers in a later wave sees (and does not repeat) what the earlier ones said.
+const PARALLEL = 3;
+
+class Slots {
+  private free = PARALLEL;
+  private waiting: Array<() => void> = [];
+  async take(): Promise<() => void> {
+    if (this.free > 0) this.free--;
+    else await new Promise<void>((r) => this.waiting.push(r));
+    let done = false;
+    return () => { if (done) return; done = true; const next = this.waiting.shift(); if (next) next(); else this.free++; };
+  }
+}
+const slots = new Slots();
+
+// Waits until an employee is free (or the time runs out), without holding a slot meanwhile.
+const whenFree = (e: Employee, ms: number) => new Promise<void>((resolve) => {
+  if (!e.busy) return resolve();
+  const finish = () => { clearTimeout(timer); e.off("status", on); resolve(); };
+  const on = () => { if (!e.busy) finish(); };
+  const timer = setTimeout(finish, ms);
+  e.on("status", on);
+});
 
 const memberKey = (m: GroupMember) => `${m.office}/${m.emp}`;
 // names as lookup keys, ignoring case, diacritics, tatweel, alef/yaa/taa-marbuta spellings and _ / spaces
@@ -57,6 +81,8 @@ export class Groups {
   private typing = new Map<string, Set<string>>();    // group → member keys composing an answer right now
   private failures = new Map<string, { timer: NodeJS.Timeout; byError: Map<string, string[]> }>(); // group → error → who; said once
   private epochs = new Map<string, number>();          // bumped when a group pauses: answers employees asked for before it are dropped
+  private stops = new Map<string, number>();           // bumped by the Stop button: every answer asked before it is dropped
+  private pending = new Map<string, number>();         // answers asked and not finished yet, per group (for the Stop button)
   private dir: string;
 
   constructor(private d: GroupsDeps) {
@@ -85,6 +111,7 @@ export class Groups {
       last: last ? { name: last.name, text: last.text.slice(0, 120), ts: last.ts } : null,
       members: g.members.map((m) => { const e = this.resolve(m); return { ...m, key: memberKey(m), name: e?.cfg.name ?? m.emp, role: e?.cfg.role ?? "", color: e?.cfg.color, officeName: this.d.officeName(m.office), gone: !e }; }),
       typing: [...(this.typing.get(g.id) ?? [])].map((k) => { const [office, emp] = k.split("/"); return this.d.employee(office, emp)?.cfg.name ?? emp; }),
+      busy: (this.pending.get(g.id) ?? 0) > 0,
     };
   }
   full(g: GroupDoc, limit = 300) { return { ...this.summary(g), messages: g.messages.slice(-limit) }; }
@@ -146,7 +173,7 @@ export class Groups {
   postFromBoss(g: GroupDoc, text: string) {
     g.chain = 0;
     g.paused = false;
-    this.append(g, "boss", t("server.meeting.boss"), text);
+    this.append(g, "boss", t("server.groups.owner"), text);
     let ask = this.mentioned(g, text);
     if (!ask.length) { const lead = g.members.find((m) => memberKey(m) === g.lead) ?? g.members[0]; if (lead) ask = [lead]; }
     for (const m of ask) this.ask(g, m, true);
@@ -172,24 +199,31 @@ export class Groups {
     this.save(g);
   }
 
-  /** One member answers. Members answer in parallel; one employee answers one group question at a time. A busy member does not
-   *  hold anyone up: the group is told, and the answer comes when they are free. Whatever goes wrong is said in the group. */
+  /** One member answers. Answers run PARALLEL at a time (waves); one employee answers one group question at a time. A busy member
+   *  does not hold anyone up: the group is told, and the answer comes when they are free. Whatever goes wrong is said in the group. */
   private ask(g: GroupDoc, m: GroupMember, byBoss: boolean) {
     const e = this.resolve(m);
     if (!e) return;
-    const epoch = this.epochs.get(g.id) ?? 0;
+    const epoch = this.epochs.get(g.id) ?? 0, stop = this.stops.get(g.id) ?? 0;
+    const dropped = () => !this.docs.has(g.id) || (this.stops.get(g.id) ?? 0) !== stop || (!byBoss && (g.paused || (this.epochs.get(g.id) ?? 0) !== epoch));
+    this.pending.set(g.id, (this.pending.get(g.id) ?? 0) + 1);
+    this.changed(g);
     const run = (this.locks.get(e) ?? Promise.resolve()).then(async () => {
-      if (!this.docs.has(g.id)) return;
-      if (!byBoss && (g.paused || (this.epochs.get(g.id) ?? 0) !== epoch)) return; // the group paused meanwhile
+      if (dropped()) return;
+      if (e.busy) { this.note(g, t("server.groups.busy", { name: e.cfg.name })); await whenFree(e, 30 * 60e3); }
+      if (dropped()) return;
+      const release = await slots.take();
       const key = memberKey(m);
-      if (e.busy) this.note(g, t("server.groups.busy", { name: e.cfg.name }));
       const typing = this.typing.get(g.id) ?? new Set<string>();
-      typing.add(key); this.typing.set(g.id, typing); this.changed(g);
       let res: Awaited<ReturnType<Employee["sendGroup"]>> = { text: "" };
-      try { res = await e.sendGroup(this.prompt(g, e)); }
-      catch (err) { res = { text: "", error: (err as Error).message }; }
-      finally { typing.delete(key); this.changed(g); }
-      if (!this.docs.has(g.id)) return;
+      try {
+        if (dropped()) return;
+        typing.add(key); this.typing.set(g.id, typing); this.changed(g);
+        // built now, not when asked: a later wave sees what the earlier ones answered
+        res = await e.sendGroup(this.prompt(g, e), 2 * 60e3);
+      } catch (err) { res = { text: "", error: (err as Error).message }; }
+      finally { release(); typing.delete(key); }
+      if (dropped()) return; // stopped while answering: a cut-off answer is not posted
       const reply = res.text.trim();
       if (res.skipped) return this.note(g, t(res.skipped === "meeting" ? "server.groups.inMeeting" : "server.groups.stillBusy", { name: e.cfg.name }));
       if (!reply && res.error) {
@@ -200,14 +234,25 @@ export class Groups {
       }
       if (!reply || /^[—–-]+$/.test(reply) || (!byBoss && isCourtesy(reply))) return;
       this.postFromEmployee(g, e, reply);
-    });
+    }).finally(() => { this.pending.set(g.id, Math.max(0, (this.pending.get(g.id) ?? 1) - 1)); if (this.docs.has(g.id)) this.changed(g); });
     this.locks.set(e, run.catch(() => {}));
+  }
+
+  /** The Stop button: nothing asked so far is answered any more, answers being written are cut off, the group waits for the boss. */
+  stop(g: GroupDoc) {
+    this.stops.set(g.id, (this.stops.get(g.id) ?? 0) + 1);
+    g.paused = true;
+    this.save(g);
+    for (const key of this.typing.get(g.id) ?? []) { const [office, emp] = key.split("/"); this.d.employee(office, emp)?.stopGroupTurn(); }
+    this.note(g, t("server.groups.stopped"));
   }
 
   // Answers that fail together (the same error for many members, e.g. Hermes is down) are said in one line, not one each.
   private failNote(g: GroupDoc, name: string, error: string) {
     let f = this.failures.get(g.id);
-    if (!f) { f = { timer: setTimeout(() => this.flushFailures(g), 2500), byError: new Map() }; this.failures.set(g.id, f); }
+    if (!f) { f = { timer: setTimeout(() => {}, 0), byError: new Map() }; this.failures.set(g.id, f); }
+    clearTimeout(f.timer);
+    f.timer = setTimeout(() => this.flushFailures(g), 4000);
     const who = f.byError.get(error) ?? [];
     who.push(name);
     f.byError.set(error, who);
@@ -224,9 +269,10 @@ export class Groups {
   }
 
   private prompt(g: GroupDoc, e: Employee): string {
-    const last = g.messages.slice(-HISTORY_LINES).map((x) => x.from === "system" ? `(${x.text})` : `${x.name}: ${x.text.replace(/\s+/g, " ").slice(0, 600)}`).join("\n");
+    const owner = t("server.groups.owner");
+    const last = g.messages.slice(-HISTORY_LINES).map((x) => x.from === "system" ? `(${x.text})` : `${x.from === "boss" ? owner : x.name}: ${x.text.replace(/\s+/g, " ").slice(0, 600)}`).join("\n");
     const members = g.members.map((m) => { const x = this.resolve(m); return x ? `- ${x.cfg.name} — ${x.cfg.role}` : ""; }).filter(Boolean).join("\n");
-    return t("server.groups.turn", { group: g.name, name: e.cfg.name, history: last || "-", members });
+    return t("server.groups.turn", { group: g.name, name: e.cfg.name, history: last || "-", members, owner });
   }
 
   /** One group per office, with everybody in it and its first employee as the lead. Offices that already have one are skipped. */
@@ -295,6 +341,7 @@ export function mountGroups(app: Express, d: GroupsDeps): Groups {
     res.json(groups.full(g));
   });
   app.delete("/api/groups/:id", (req, res) => { const g = groups.get(req.params.id); if (!g) return res.status(404).json({ error: t("server.notFound") }); groups.remove(g); res.json({ ok: true }); });
+  app.post("/api/groups/:id/stop", (req, res) => { const g = groups.get(req.params.id); if (!g) return res.status(404).json({ error: t("server.notFound") }); groups.stop(g); res.json({ ok: true }); });
   app.post("/api/groups/:id/messages", (req, res) => {
     const g = groups.get(req.params.id);
     if (!g) return res.status(404).json({ error: t("server.notFound") });

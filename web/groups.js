@@ -52,7 +52,13 @@
 
   // ---- render ----
   const time = (ts) => { try { return new Date(ts).toLocaleTimeString(PO.locale, { hour: "2-digit", minute: "2-digit" }); } catch { return ""; } };
-  const withMentions = (s) => escapeHtml(s).replace(/(^|\s)(@[^\s@،,.:!?؟]+)/g, '$1<span class="mention">$2</span>');
+  // Markdown like the private chat (md() escapes everything first), then @names highlighted outside the tags
+  // (members' full names first, so "@المدير العام" is marked whole, then any other @word)
+  const reEsc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const withMentions = (s) => {
+    const names = [...(cur()?.members || []).map((m) => m.name), "الكل", "الجميع", "all"].filter(Boolean).sort((a, b) => b.length - a.length).map((n) => reEsc(escapeHtml(n)));
+    return md(s).replace(new RegExp(`(^|[\\s>])(@(?:${names.join("|")}|[^\\s@<،,.:!?؟]+))`, "g"), '$1<span class="mention">$2</span>');
+  };
   function render() { if (!open()) { badge(); return; } renderList(); renderPane(); }
   function renderList() {
     const list = $g("grList");
@@ -75,7 +81,7 @@
     const msgs = G.msgs.get(g.id) || [];
     pane.innerHTML = `<div class="gr-chat-head"><div><b>${escapeHtml(g.name)}</b>
           <small>${escapeHtml(g.members.filter((m) => !m.gone).map((m) => m.name).join("، "))}</small></div>
-        <div class="gr-head-actions">${g.paused ? `<span class="gr-paused">${escapeHtml(t("ui.groups.paused"))}</span>` : ""}
+        <div class="gr-head-actions">${headState(g)}
           <button class="btn small ghost" data-g="edit">${escapeHtml(t("ui.groups.edit"))}</button></div></div>
       <div class="gr-msgs" id="grMsgs">${msgs.map(msgHtml).join("")}</div>
       <div class="gr-typing" id="grTyping">${g.typing?.length ? escapeHtml(t("ui.groups.typing", { names: g.typing.join("، ") })) : ""}</div>
@@ -84,6 +90,11 @@
         <button class="btn primary" type="submit">${escapeHtml(t("ui.groups.send"))}</button></form>`;
     $g("grText")?.focus();
     badge();
+  }
+  // while answers are coming: the Stop button; when the group waits: the paused badge
+  function headState(g) {
+    if (g.busy) return `<button class="btn small gr-stop" data-g="stop" title="${escapeHtml(t("ui.groups.stopTip"))}">⏹ ${escapeHtml(t("ui.groups.stop"))}</button>`;
+    return g.paused ? `<span class="gr-paused">${escapeHtml(t("ui.groups.paused"))}</span>` : "";
   }
   function msgHtml(m) {
     if (m.from === "system") return `<div class="gr-msg system">${escapeHtml(m.text)}</div>`;
@@ -132,6 +143,7 @@
     else if (a === "new") openForm(null);
     else if (a === "edit") openForm(cur());
     else if (a === "cancel") { G.view = "chat"; render(); }
+    else if (a === "stop") { const g = cur(); if (g) try { await api("POST", `/api/groups/${encodeURIComponent(g.id)}/stop`); } catch (e) { toast(e.message); } }
     else if (a === "fromOffices") {
       try { const r = await api("POST", "/api/groups/from-offices"); toast(t("ui.groups.fromOfficesDone", { n: r.added })); await loadList(); if (!G.cur && G.list[0]) select(G.list[0].id); } catch (e) { toast(e.message); }
     } else if (a === "delete") {
@@ -168,8 +180,7 @@
         if (m.group.id === G.cur && G.view === "chat") {
           const el = $g("grTyping"); if (el) el.textContent = m.group.typing?.length ? t("ui.groups.typing", { names: m.group.typing.join("، ") }) : "";
           const head = document.querySelector(".gr-chat-head .gr-head-actions");
-          const p = head?.querySelector(".gr-paused");
-          if (head && !!p !== !!m.group.paused) { if (p) p.remove(); else head.insertAdjacentHTML("afterbegin", `<span class="gr-paused">${escapeHtml(t("ui.groups.paused"))}</span>`); }
+          if (head) { head.querySelectorAll(".gr-paused, .gr-stop").forEach((x) => x.remove()); head.insertAdjacentHTML("afterbegin", headState(m.group)); }
         }
         const list = $g("grList"); const keep = list?.scrollTop; renderList(); if (list) list.scrollTop = keep;
       }

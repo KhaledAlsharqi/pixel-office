@@ -383,7 +383,7 @@
     },
     "groups": {
       "paused": "The group paused after {n} answers in a row between employees. Write something to continue.",
-      "turn": "[Group chat «{group}»: your turn to answer, {name}]\nLast messages:\n{history}\n\nMembers:\n{members}\n\nWrite only your answer: it is posted in the group under your name. Add something new (information, a decision, a question); do not answer only to thank or agree. To ask one or two members to join in, write @ and their name (@all is for the boss only). If you have nothing to add, write only «—». Do not use post_to_group for this answer.",
+      "turn": "[Group chat «{group}»: your turn to answer, {name}]\nLast messages (oldest first):\n{history}\n\nMembers:\n{members}\n\nMessages from «{owner}» are the company owner's directions to you.\nWrite only your answer: it is posted in the group under your name.\n- Keep it short, as in a chat app: one to four lines, unless you are asked for detail.\n- Do not repeat what a colleague already said; add only what is new (information, a decision, a question), and do not answer only to thank or agree.\n- To ask one or two members to join in, write @ and their name (@all is for the owner only).\n- If you have nothing to add, write only «—».\nDo not use post_to_group for this answer.",
       "listDesc": "List the group chats you are in, with their last message.",
       "none": "You are in no group chat.",
       "readDesc": "Read the latest messages of one of your group chats.",
@@ -399,7 +399,9 @@
       "failed": "⚠️ {name} could not answer: {error}",
       "timeout": "⚠️ {name} did not answer within 10 minutes.",
       "sep": ", ",
-      "manyNames": "{names} and {n} more"
+      "manyNames": "{names} and {n} more",
+      "owner": "The owner",
+      "stopped": "⏹️ The owner stopped the discussion. Write a message to go on."
     }
   },
   "rooms": {
@@ -5748,7 +5750,9 @@
       "paused": "Paused: waiting for you",
       "membersN": "{n} members",
       "you": "You",
-      "hint": "Nobody named → the lead answers · @all → everyone answers · agents can name each other"
+      "hint": "Nobody named → the lead answers · @all → everyone answers · agents can name each other",
+      "stop": "Stop",
+      "stopTip": "Stops the discussion and the answers being written"
     }
   }
 }

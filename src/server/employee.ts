@@ -678,6 +678,8 @@ export class Employee extends EventEmitter {
   // Resolves with the answer, or with what went wrong (the turn's error, a timeout, or why it never started).
   private groupTurn = false;
   get inGroupTurn() { return this.groupTurn; }
+  /** The group's Stop button: a group answer being written is cut off (nothing else this employee does is touched). */
+  stopGroupTurn() { if (this.groupTurn && this.busy) void this.interrupt({ task: "keep", resume: false }); }
   async sendGroup(prompt: string, maxWaitMs = 30 * 60e3): Promise<{ text: string; error?: string; skipped?: "busy" | "meeting" }> {
     await this.whenFree(maxWaitMs);
     if (this.inMeeting) return { text: "", skipped: "meeting" };
@@ -702,7 +704,8 @@ export class Employee extends EventEmitter {
       }, 10 * 60e3);
       this.on("turn", done);
       this.on("message", onMsg);
-      this.dispatch("side", prompt, { digest: true });
+      // no status digest: a short chat answer does not need the board and git summary (and every member would pay for it)
+      this.dispatch("side", prompt);
     });
   }
 
@@ -950,20 +953,26 @@ export class Employee extends EventEmitter {
   }
 
   private buildPrompt(): string {
+    // a group answer is one short message: the employee's own prompt and memory are enough, the office's long notes are not sent
+    if (this.groupTurn) return [this.cfg.systemPrompt, this.memoryPart()].filter(Boolean).join("\n\n");
     const parts = [this.cfg.systemPrompt];
     const others = this.colleagues?.list().filter((e) => e !== this) ?? [];
     if (others.length) parts.push(t("server.office.prompt", { list: others.map((e) => `- ${e.cfg.name} — ${e.cfg.role}${e.cfg.manager ? " — " + t("server.board.managerTag") : ""}`).join("\n") }));
     if (this.colleagues) parts.push(t(this.cfg.manager ? "server.board.promptManager" : "server.board.prompt"));
     if (this.cfg.worktree && this.cfg.baseCwd && this.cfg.baseCwd !== this.cfg.cwd) parts.push(t("server.worktree.prompt", { branch: `po/${this.cfg.id}`, base: this.cfg.baseCwd }));
     parts.push(t("server.efficiency"));
-    if (this.cfg.memoryFile) {
-      // the full path: a relative one (../../../…) stops pointing anywhere the moment the employee cd's into a subfolder
-      const rel = this.cfg.memoryFile;
-      let memory = "";
-      try { memory = fs.readFileSync(this.cfg.memoryFile, "utf8").trim(); } catch {}
-      parts.push(t("server.memoryPrompt", { file: rel }) + "\n\n" + (memory ? t("server.memoryCurrent", { memory }) : t("server.memoryEmpty")) + (memory.length > MEMORY_SOFT_LIMIT ? "\n\n" + t("server.memoryTooLong", { chars: memory.length, limit: MEMORY_SOFT_LIMIT }) : ""));
-    }
+    const mem = this.memoryPart();
+    if (mem) parts.push(mem);
     return parts.join("\n\n");
+  }
+
+  private memoryPart(): string {
+    if (!this.cfg.memoryFile) return "";
+    // the full path: a relative one (../../../…) stops pointing anywhere the moment the employee cd's into a subfolder
+    const rel = this.cfg.memoryFile;
+    let memory = "";
+    try { memory = fs.readFileSync(this.cfg.memoryFile, "utf8").trim(); } catch {}
+    return t("server.memoryPrompt", { file: rel }) + "\n\n" + (memory ? t("server.memoryCurrent", { memory }) : t("server.memoryEmpty")) + (memory.length > MEMORY_SOFT_LIMIT ? "\n\n" + t("server.memoryTooLong", { chars: memory.length, limit: MEMORY_SOFT_LIMIT }) : "");
   }
 
   // Starts a process for one session (`key`): "chat", "task:<id>" or "side".
@@ -1382,7 +1391,7 @@ export class Employee extends EventEmitter {
         const profile = hermesProfileOf(this.cfg.model!);
         const list = others.map((e) => `- ${e.cfg.name} — ${e.cfg.role}${e.cfg.manager ? " — " + t("server.board.managerTag") : ""}`).join("\n");
         // with the office tools linked into the profile it works like any colleague (messages, board); without them, a short note
-        const instructions = hermesLinked(profile)
+        const instructions = this.groupTurn ? this.cfg.systemPrompt : hermesLinked(profile)
           ? [this.cfg.systemPrompt, ...(others.length ? [t("server.office.prompt", { list })] : []), ...(this.colleagues ? [t(this.cfg.manager ? "server.board.promptManager" : "server.board.prompt")] : [])].join("\n\n")
           : [this.cfg.systemPrompt, tt("server.hermes.officeNote", "You are working through the boss's office (Pixel Office). Colleagues in this office:\n{list}\n\nThe office tools (message_colleague, the board) are not wired into Hermes: answer here, and when part of a request belongs to a colleague, say who, so the boss can pass it on.", { list: others.map((e) => `- ${e.cfg.name} — ${e.cfg.role}`).join("\n") || "-" })].join("\n\n");
         const hash = crypto.createHash("sha1").update(instructions).digest("hex");

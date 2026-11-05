@@ -31,9 +31,17 @@ const memberKey = (m: GroupMember) => `${m.office}/${m.emp}`;
 const nameKey = (s: string) => s.normalize("NFKC").toLowerCase().replace(/[ً-ٰٟـ]/g, "")
   .replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/[\s_-]+/g, " ").trim();
 const ALL = ["الكل", "الجميع", "all", "everyone", "herkes"].map(nameKey);
-// an answer that only thanks or agrees adds nothing to a conversation between employees
-const COURTESY = /^(شكرا|شكرًا|شكراً|مشكور|تمام|اتفق|أتفق|متفق|موافق|حسنا|حسنًا|حسناً|ممتاز|رائع|جميل|تم|ok|okay|thanks|thank you|agreed|noted|great|sounds good|👍|🙏)/i;
-const isCourtesy = (s: string) => s.length <= 60 && !/[?؟@]/.test(s) && COURTESY.test(s.trim());
+// an answer that only thanks or agrees adds nothing to a conversation between employees: a few words at most, starting with one
+// of these as a whole word (so "تم رفع التقرير" or "تمويل المشروع جاهز" are kept), with no question, mention or number in it
+const COURTESY_WORDS = new Set(["شكرا", "شكرًا", "شكراً", "مشكور", "مشكورين", "تمام", "اتفق", "أتفق", "متفق", "موافق", "حسنا", "حسنًا", "حسناً",
+  "ممتاز", "رائع", "جميل", "ok", "okay", "thanks", "thank", "thx", "agreed", "noted", "great", "👍", "🙏"]);
+const isCourtesy = (s: string) => {
+  const text = s.trim();
+  if (!text || text.length > 40 || /[?؟@\d٠-٩]/.test(text)) return false;
+  if (text === "تم") return true;
+  const words = text.replace(/[.,،!؛:…()"«»\-–—]/g, " ").split(/\s+/).filter(Boolean);
+  return words.length > 0 && words.length <= 4 && COURTESY_WORDS.has(words[0].toLowerCase());
+};
 
 export interface GroupsDeps {
   employee(office: string, emp: string): Employee | undefined;
